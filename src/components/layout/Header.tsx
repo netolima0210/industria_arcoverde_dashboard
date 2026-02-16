@@ -1,21 +1,9 @@
 
-import { Bell, Search, User } from 'lucide-react';
+import { Bell } from 'lucide-react';
 
 export function Header() {
     return (
-        <header className="h-16 bg-white border-b border-gray-200/80 flex items-center justify-between px-6 fixed top-0 right-0 left-0 md:left-64 z-10">
-            <div className="flex items-center gap-4 flex-1">
-                {/* Search Bar */}
-                <div className="relative max-w-md w-full hidden sm:block">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <input
-                        type="text"
-                        placeholder="Pesquisar..."
-                        className="w-full pl-10 pr-4 py-2 bg-gray-100 rounded-full text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:bg-white border border-transparent focus:border-primary/30 transition-all"
-                    />
-                </div>
-            </div>
-
+        <header className="h-16 bg-white border-b border-gray-200/80 flex items-center justify-end px-6 fixed top-0 right-0 left-0 md:left-64 z-10">
             <div className="flex items-center gap-3">
                 <button className="p-2 text-gray-500 hover:bg-gray-100 rounded-full relative transition-colors">
                     <Bell className="h-5 w-5" />
