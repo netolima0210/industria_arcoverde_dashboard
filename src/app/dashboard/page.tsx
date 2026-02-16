@@ -1,163 +1,242 @@
 
 import { createClient } from '@/utils/supabase/server';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowDown, ArrowUp, MessageSquare, Users, CheckCircle, Clock } from 'lucide-react';
-import { ConversasChart } from '@/components/dashboard/ConversationsChart'; // Assuming component export name
-
-// Renaming import to match file export if needed, checking file content of chart...
-// File content export name: ConversationsChart
+import { MessageSquare, CheckCircle, Zap, PhoneIncoming } from 'lucide-react';
 import { ConversationsChart } from '@/components/dashboard/ConversationsChart';
+import { DateFilter } from '@/components/dashboard/DateFilter';
+import { startOfMonth, endOfMonth } from 'date-fns';
 
-export default async function DashboardPage() {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ start_date?: string, end_date?: string, filter?: string }> }) {
     const supabase = await createClient();
+    const params = await searchParams;
 
-    // 1. Total Conversas
-    const { count: totalConversas } = await supabase
-        .from('conversas')
-        .select('*', { count: 'exact', head: true });
+    // Determine Date Range
+    const now = new Date();
+    const startDate = params.start_date ? new Date(params.start_date) : startOfMonth(now);
+    const endDate = params.end_date ? new Date(params.end_date) : endOfMonth(now);
 
-    // 2. Leads Novos (Clientes criados hoje)
-    const todayObs = new Date(); // using 'todayObs' to avoid conflict if I use 'today' later
-    todayObs.setHours(0, 0, 0, 0);
-    const { count: totalLeads } = await supabase
-        .from('clientes')
-        .select('*', { count: 'exact', head: true });
-    // .gte('created_at', todayObs.toISOString()); // Uncomment for "Today" specifically
+    // 1. Fetch chat messages filtered by date
+    const { data: chatMessages } = await supabase
+        .from('n8n_chat_conversas')
+        .select('session_id, created_at, message')
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString());
 
-    // 3. Taxa de Resolução
-    const { count: resolvidaBot } = await supabase
-        .from('conversas')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'resolvida_bot');
+    // --- PROCESSAMENTO DE DADOS (Heurísticas) ---
+    const sessions = new Map();
+    let totalMensagens = 0;
+    let transferenciasCount = 0;
 
-    // Calculate rate (FIXED TYPO HERE)
-    const taxaResolucao = totalConversas && totalConversas > 0
-        ? ((resolvidaBot || 0) / totalConversas) * 100
-        : 0;
+    const transferKeywords = ['transferindo', 'atendente', 'humano', 'setor', 'financeiro', 'comercial', 'compras'];
 
-    // 4. Tempo Médio
-    const { data: duracaoData } = await supabase
-        .from('conversas')
-        .select('duracao_segundos')
-        .not('duracao_segundos', 'is', null)
-        .limit(100);
+    if (chatMessages) {
+        totalMensagens = chatMessages.length;
 
-    const avgDuration = duracaoData && duracaoData.length > 0
-        ? duracaoData.reduce((acc, curr) => acc + (curr.duracao_segundos || 0), 0) / duracaoData.length
-        : 0;
+        chatMessages.forEach(msg => {
+            const currentSession = sessions.get(msg.session_id) || {
+                created_at: new Date(msg.created_at),
+                last_at: new Date(msg.created_at),
+                msg_count: 0,
+                has_transfer: false
+            };
 
-    // Formatting duration
-    const formatDuration = (seconds: number) => {
-        const m = Math.floor(seconds / 60);
-        const s = Math.round(seconds % 60);
-        return `${m}m ${s}s`;
-    }
+            const msgDate = new Date(msg.created_at);
+            if (msgDate > currentSession.last_at) currentSession.last_at = msgDate;
+            currentSession.msg_count++;
 
-    // 5. Chart Data (Conversations by Hour)
-    const { data: conversationsToday } = await supabase
-        .from('conversas')
-        .select('created_at')
-        .gte('created_at', todayObs.toISOString());
+            if (msg.message && typeof msg.message === 'object') {
+                const content = (msg.message as any).content?.toLowerCase() || '';
+                const type = (msg.message as any).type;
 
-    const chartData = Array.from({ length: 24 }, (_, i) => ({
-        hour: `${i}h`,
-        count: 0
-    }));
-
-    if (conversationsToday) {
-        conversationsToday.forEach(conv => {
-            const date = new Date(conv.created_at);
-            // Adjust for timezone if needed, assuming server time is UTC or consistent
-            // If created_at is UTC, and we want local time, we might need adjustment.
-            // For MVP, using getHours() from the parsed date (which might be local or UTC depending on env)
-            const hour = date.getHours();
-            if (chartData[hour]) {
-                chartData[hour].count++;
+                if (type === 'ai' && transferKeywords.some(keyword => content.includes(keyword))) {
+                    currentSession.has_transfer = true;
+                }
             }
+
+            sessions.set(msg.session_id, currentSession);
         });
     }
 
+    const totalConversas = sessions.size;
+
+    sessions.forEach((session) => {
+        if (session.has_transfer) transferenciasCount++;
+    });
+
+    const taxaResolucao = totalConversas > 0
+        ? ((totalConversas - transferenciasCount) / totalConversas * 100).toFixed(1)
+        : '0';
+
+    // 2. Novos Leads no Período
+    const { count: novosLeads } = await supabase
+        .from('clientes')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString());
+
+    // 3. Chart Data
+    const diffDays = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
+    const isDailyChart = diffDays > 1.5;
+
+    let chartData: { hour: string; count: number }[];
+    let chartLabel: string;
+
+    if (isDailyChart) {
+        chartLabel = "Mensagens por Dia";
+        const dayMap = new Map<string, number>();
+
+        if (chatMessages) {
+            chatMessages.forEach(msg => {
+                const date = new Date(msg.created_at);
+                const dayKey = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+                dayMap.set(dayKey, (dayMap.get(dayKey) || 0) + 1);
+            });
+        }
+
+        chartData = Array.from(dayMap.entries()).map(([day, count]) => ({
+            hour: day,
+            count
+        })).sort((a, b) => {
+            const [dA, mA] = a.hour.split('/');
+            const [dB, mB] = b.hour.split('/');
+            return new Date(2024, parseInt(mA) - 1, parseInt(dA)).getTime() - new Date(2024, parseInt(mB) - 1, parseInt(dB)).getTime();
+        });
+
+    } else {
+        chartLabel = "Mensagens por Hora";
+        chartData = Array.from({ length: 24 }, (_, i) => ({
+            hour: `${i}h`,
+            count: 0
+        }));
+
+        if (chatMessages) {
+            chatMessages.forEach(msg => {
+                const date = new Date(msg.created_at);
+                if (date.getDate() === startDate.getDate()) {
+                    const hour = date.getHours();
+                    if (chartData[hour]) {
+                        chartData[hour].count++;
+                    }
+                }
+            });
+        }
+    }
+
+    // Metric cards config
+    const metrics = [
+        {
+            label: 'Conversas',
+            value: totalConversas,
+            sub: 'iniciadas no período',
+            icon: Zap,
+            color: 'bg-blue-500',
+            iconColor: 'text-white',
+        },
+        {
+            label: 'Resolução Bot',
+            value: `${taxaResolucao}%`,
+            sub: 'sem humano',
+            icon: CheckCircle,
+            color: 'bg-green-500',
+            iconColor: 'text-white',
+        },
+        {
+            label: 'Transferências',
+            value: transferenciasCount,
+            sub: 'para setores',
+            icon: PhoneIncoming,
+            color: 'bg-orange-500',
+            iconColor: 'text-white',
+        },
+        {
+            label: 'Mensagens',
+            value: totalMensagens,
+            sub: 'no período',
+            icon: MessageSquare,
+            color: 'bg-purple-500',
+            iconColor: 'text-white',
+        },
+    ];
+
     return (
         <div className="space-y-6">
-            <h1 className="text-2xl font-bold text-gray-800">Visão Geral</h1>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {/* Metrics Cards (Same as before) */}
-                <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
-                    <div className="flex items-center justify-between space-x-4">
-                        <div className="flex items-center space-x-2">
-                            <div className="p-2 bg-blue-50 rounded-lg">
-                                <MessageSquare className="h-6 w-6 text-primary" />
-                            </div>
-                            <h3 className="text-sm font-medium text-gray-500">Total Conversas</h3>
+            {/* Header Row */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h1 className="text-2xl font-bold text-gray-800">Visão Geral</h1>
+                    <div className="flex items-center gap-2 mt-1">
+                        <div className="text-xs text-gray-500 bg-white px-3 py-1 rounded-full flex items-center gap-2 shadow-sm border border-gray-200/50">
+                            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                            Sistema Operacional
                         </div>
+                        <span className="text-xs text-gray-400">
+                            {startDate.toLocaleDateString('pt-BR')} - {endDate.toLocaleDateString('pt-BR')}
+                        </span>
                     </div>
-                    <p className="text-2xl font-bold text-gray-900 mt-4">{totalConversas || 0}</p>
-                    <span className="text-xs text-green-600 font-medium flex items-center gap-1 mt-1">
-                        <ArrowUp className="h-3 w-3" />
-                        -
-                        <span className="text-gray-400">total</span>
-                    </span>
                 </div>
-
-                <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
-                    <div className="flex items-center justify-between space-x-4">
-                        <div className="flex items-center space-x-2">
-                            <div className="p-2 bg-green-50 rounded-lg">
-                                <Users className="h-6 w-6 text-green-600" />
-                            </div>
-                            <h3 className="text-sm font-medium text-gray-500">Total Contatos</h3>
-                        </div>
-                    </div>
-                    <p className="text-2xl font-bold text-gray-900 mt-4">{totalLeads || 0}</p>
-                    <span className="text-xs text-green-600 font-medium flex items-center gap-1 mt-1">
-                        <ArrowUp className="h-3 w-3" />
-                        -
-                        <span className="text-gray-400">total</span>
-                    </span>
-                </div>
-
-                <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
-                    <div className="flex items-center justify-between space-x-4">
-                        <div className="flex items-center space-x-2">
-                            <div className="p-2 bg-purple-50 rounded-lg">
-                                <CheckCircle className="h-6 w-6 text-purple-600" />
-                            </div>
-                            <h3 className="text-sm font-medium text-gray-500">Resolução Bot</h3>
-                        </div>
-                    </div>
-                    <p className="text-2xl font-bold text-gray-900 mt-4">{taxaResolucao.toFixed(1)}%</p>
-                    <span className="text-xs text-gray-400 font-medium mt-1 block">
-                        Target: 70%
-                    </span>
-                </div>
-
-                <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
-                    <div className="flex items-center justify-between space-x-4">
-                        <div className="flex items-center space-x-2">
-                            <div className="p-2 bg-orange-50 rounded-lg">
-                                <Clock className="h-6 w-6 text-orange-600" />
-                            </div>
-                            <h3 className="text-sm font-medium text-gray-500">Tempo Médio</h3>
-                        </div>
-                    </div>
-                    <p className="text-2xl font-bold text-gray-900 mt-4">{formatDuration(avgDuration)}</p>
-                    <span className="text-xs text-gray-400 font-medium mt-1 block">
-                        Global
-                    </span>
+                <div className="flex items-center space-x-2">
+                    <span className="text-sm text-gray-500">Período:</span>
+                    <DateFilter />
                 </div>
             </div>
 
-            {/* Charts Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-                <div className="bg-white p-6 rounded-xl shadow-sm border h-80">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Conversas por Hora (Hoje)</h3>
-                    <div className="h-64">
+            {/* Metric Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                {metrics.map((m, i) => (
+                    <div key={i} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200/60 hover:shadow-md transition-all duration-200 group">
+                        <div className="flex items-center gap-3 mb-3">
+                            <div className={`p-2.5 ${m.color} rounded-xl shadow-sm`}>
+                                <m.icon className={`h-5 w-5 ${m.iconColor}`} />
+                            </div>
+                            <h3 className="text-sm font-medium text-gray-500">{m.label}</h3>
+                        </div>
+                        <p className="text-3xl font-bold text-gray-900">{m.value}</p>
+                        <span className="text-xs text-gray-400 mt-1 block">{m.sub}</span>
+                    </div>
+                ))}
+            </div>
+
+            {/* Charts + Performance Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                {/* Chart */}
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200/60 h-[400px]">
+                    <div className="mb-6">
+                        <h3 className="text-lg font-semibold text-gray-800">Fluxo de Mensagens</h3>
+                        <p className="text-sm text-gray-400">{chartLabel}</p>
+                    </div>
+                    <div className="h-64 w-full">
                         <ConversationsChart data={chartData} />
                     </div>
                 </div>
-                <div className="bg-white p-6 rounded-xl shadow-sm border h-80 flex flex-col items-center justify-center text-gray-400">
-                    <p>Funil de Vendas (Em breve)</p>
+
+                {/* Performance Card */}
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200/60 h-[400px] flex flex-col">
+                    <div className="mb-6">
+                        <h3 className="text-lg font-semibold text-gray-800">Performance Geral</h3>
+                        <p className="text-sm text-gray-400">Indicadores do período</p>
+                    </div>
+
+                    <div className="space-y-4 flex-1 overflow-auto">
+                        <div className="flex justify-between items-center p-4 bg-gray-50 rounded-xl">
+                            <span className="text-sm font-medium text-gray-600">Sessões Únicas</span>
+                            <span className="font-bold text-gray-900 text-lg">{totalConversas}</span>
+                        </div>
+                        <div className="flex justify-between items-center p-4 bg-gray-50 rounded-xl">
+                            <span className="text-sm font-medium text-gray-600">Novos Leads</span>
+                            <span className="font-bold text-gray-900 text-lg">{novosLeads || 0}</span>
+                        </div>
+                        <div className="flex justify-between items-center p-4 bg-gray-50 rounded-xl">
+                            <span className="text-sm font-medium text-gray-600">Média Msgs/Conversa</span>
+                            <span className="font-bold text-gray-900 text-lg">
+                                {totalConversas > 0 ? (totalMensagens / totalConversas).toFixed(1) : '0'}
+                            </span>
+                        </div>
+                        <div className="flex justify-between items-center p-4 bg-blue-50 rounded-xl border border-blue-100">
+                            <span className="text-sm font-medium text-blue-700">Status do Agente</span>
+                            <span className="font-bold text-green-600 flex items-center gap-2">
+                                <span className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse"></span> Online
+                            </span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

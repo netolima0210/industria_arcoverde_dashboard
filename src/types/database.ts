@@ -94,6 +94,26 @@ export interface Database {
                     sentimento?: string | null
                     created_at?: string
                 }
+            },
+            n8n_chat_conversas: {
+                Row: {
+                    id: number
+                    session_id: string
+                    message: Json
+                    created_at: string
+                }
+                Insert: {
+                    id?: number
+                    session_id: string
+                    message: Json
+                    created_at?: string
+                }
+                Update: {
+                    id?: number
+                    session_id?: string
+                    message?: Json
+                    created_at?: string
+                }
             }
             // Add other tables as needed for MVP
         }

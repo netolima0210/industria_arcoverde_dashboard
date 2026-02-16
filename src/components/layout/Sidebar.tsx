@@ -1,43 +1,66 @@
+'use client';
 
 import Link from 'next/link';
-import { LayoutDashboard, Users, MessageSquare, Package, Settings, LogOut } from 'lucide-react';
+import { usePathname } from 'next/navigation';
+import { LayoutDashboard, Users, MessageSquare, Package, Settings, LogOut, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/leads', label: 'Leads', icon: Users },
-    { href: '/conversas', label: 'Conversas', icon: MessageSquare },
-    { href: '/produtos', label: 'Produtos', icon: Package },
-    { href: '/configuracoes', label: 'Configurações', icon: Settings },
+    { href: '/dashboard/leads', label: 'Leads', icon: Users },
+    { href: '/dashboard/conversas', label: 'Conversas', icon: MessageSquare },
+    { href: '/dashboard/produtos', label: 'Produtos', icon: Package },
+    { href: '/dashboard/configuracoes', label: 'Configurações', icon: Settings },
 ];
 
 export function Sidebar() {
+    const pathname = usePathname();
+
     return (
-        <aside className="w-64 bg-white border-r h-screen hidden md:flex flex-col fixed left-0 top-0">
-            <div className="p-6 border-b flex items-center justify-center">
-                <h1 className="text-xl font-bold text-primary">Arcoverde</h1>
+        <aside className="w-64 bg-primary h-screen hidden md:flex flex-col fixed left-0 top-0 z-20">
+            {/* Logo */}
+            <div className="p-6 flex items-center gap-3">
+                <div className="h-10 w-10 bg-white/20 rounded-xl flex items-center justify-center">
+                    <Zap className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                    <h1 className="text-lg font-bold text-white leading-tight">Indústria</h1>
+                    <p className="text-xs text-white/70 font-medium">Arcoverde</p>
+                </div>
             </div>
 
-            <nav className="flex-1 p-4 space-y-1">
-                {navItems.map((item) => (
-                    <Link
-                        key={item.href}
-                        href={item.href}
-                        className={cn(
-                            "flex items-center gap-3 px-4 py-3 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-primary transition-colors",
-                            // Add active state logic here if needed (using usePathname)
-                        )}
-                    >
-                        <item.icon className="h-5 w-5" />
-                        <span className="font-medium">{item.label}</span>
-                    </Link>
-                ))}
+            {/* Nav */}
+            <nav className="flex-1 px-3 mt-4 space-y-1">
+                {navItems.map((item) => {
+                    const isActive = pathname === item.href ||
+                        (item.href !== '/dashboard' && pathname.startsWith(item.href));
+
+                    return (
+                        <Link
+                            key={item.href}
+                            href={item.href}
+                            className={cn(
+                                "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200",
+                                isActive
+                                    ? "bg-white text-primary shadow-sm"
+                                    : "text-white/80 hover:bg-white/10 hover:text-white"
+                            )}
+                        >
+                            <item.icon className={cn(
+                                "h-5 w-5",
+                                isActive ? "text-primary" : "text-white/80"
+                            )} />
+                            <span>{item.label}</span>
+                        </Link>
+                    );
+                })}
             </nav>
 
-            <div className="p-4 border-t">
-                <button className="flex items-center gap-3 px-4 py-3 w-full text-left text-gray-600 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors">
+            {/* Bottom */}
+            <div className="px-3 pb-6">
+                <button className="flex items-center gap-3 px-4 py-3 w-full text-left text-white/60 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200 text-sm font-medium">
                     <LogOut className="h-5 w-5" />
-                    <span className="font-medium">Sair</span>
+                    <span>Sair</span>
                 </button>
             </div>
         </aside>

@@ -19,27 +19,32 @@ export function ConversationsChart({ data }: ConversationsChartProps) {
                     bottom: 0,
                 }}
             >
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f3f4" />
                 <XAxis
                     dataKey="hour"
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fill: '#9CA3AF', fontSize: 12 }}
+                    tick={{ fill: '#80868b', fontSize: 12 }}
                 />
                 <YAxis
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fill: '#9CA3AF', fontSize: 12 }}
+                    tick={{ fill: '#80868b', fontSize: 12 }}
                 />
                 <Tooltip
-                    cursor={{ fill: 'transparent' }}
-                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    cursor={{ fill: '#e8f0fe' }}
+                    contentStyle={{
+                        borderRadius: '12px',
+                        border: 'none',
+                        boxShadow: '0 1px 3px 0 rgb(60 64 67 / 0.3), 0 4px 8px 3px rgb(60 64 67 / 0.15)',
+                        padding: '8px 16px',
+                    }}
                 />
                 <Bar
                     dataKey="count"
-                    fill="#0066CC"
-                    radius={[4, 4, 0, 0]}
-                    barSize={40}
+                    fill="#1a73e8"
+                    radius={[6, 6, 0, 0]}
+                    barSize={36}
                 />
             </BarChart>
         </ResponsiveContainer>
