@@ -118,6 +118,33 @@ export async function submitTemplateMeta(formData: FormData) {
     }
 }
 
+// ─── List Templates from Meta ────────────────────
+export async function listTemplatesMeta() {
+    const token = process.env.META_WHATSAPP_TOKEN;
+    const wabaId = process.env.META_WABA_ID;
+
+    if (!token || !wabaId) {
+        return { error: 'Credenciais da Meta não configuradas.', templates: [] };
+    }
+
+    try {
+        const response = await fetch(
+            `${META_API_URL}/${wabaId}/message_templates?fields=name,status,category,language&limit=50`,
+            { headers: { 'Authorization': `Bearer ${token}` }, cache: 'no-store' }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            return { error: data.error?.message || 'Erro ao buscar templates.', templates: [] };
+        }
+
+        return { templates: data.data as { name: string; status: string; category: string; language: string }[] };
+    } catch {
+        return { error: 'Falha na comunicação com a API da Meta.', templates: [] };
+    }
+}
+
 // ─── Send Campaign Messages ──────────────────────
 export async function sendCampaign(campaignId: string) {
     const supabase = await createClient();

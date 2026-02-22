@@ -1,15 +1,16 @@
 import { createClient } from '@/utils/supabase/server';
 import { Megaphone, Plus } from 'lucide-react';
 import { CampaignList } from '@/components/dashboard/CampaignList';
+import { listTemplatesMeta } from './actions';
 import Link from 'next/link';
 
 export default async function CampanhasPage() {
     const supabase = await createClient();
 
-    const { data: campanhas } = await supabase
-        .from('campanhas')
-        .select('*')
-        .order('created_at', { ascending: false });
+    const [{ data: campanhas }, { templates }] = await Promise.all([
+        supabase.from('campanhas').select('*').order('created_at', { ascending: false }),
+        listTemplatesMeta()
+    ]);
 
     return (
         <div className="space-y-6">
@@ -27,7 +28,7 @@ export default async function CampanhasPage() {
                 </Link>
             </div>
 
-            <CampaignList campanhas={campanhas || []} />
+            <CampaignList campanhas={campanhas || []} templates={templates || []} />
         </div>
     );
 }

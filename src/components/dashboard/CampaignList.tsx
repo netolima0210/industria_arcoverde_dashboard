@@ -10,7 +10,10 @@ import {
     Clock,
     CheckCircle2,
     AlertCircle,
-    Image as ImageIcon
+    Image as ImageIcon,
+    FileText,
+    XCircle,
+    HelpCircle
 } from 'lucide-react';
 import { deleteCampaign, sendCampaign } from '@/app/dashboard/campanhas/actions';
 import { useRouter } from 'next/navigation';
@@ -28,8 +31,16 @@ interface Campanha {
     created_at: string;
 }
 
+interface Template {
+    name: string;
+    status: string;
+    category: string;
+    language: string;
+}
+
 interface CampaignListProps {
     campanhas: Campanha[];
+    templates: Template[];
 }
 
 const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
@@ -39,7 +50,15 @@ const statusConfig: Record<string, { label: string; color: string; icon: any }> 
     pausada: { label: 'Pausada', color: 'bg-yellow-100 text-yellow-700', icon: AlertCircle },
 };
 
-export function CampaignList({ campanhas }: CampaignListProps) {
+const templateStatusConfig: Record<string, { label: string; color: string; icon: any }> = {
+    APPROVED: { label: 'Aprovado', color: 'bg-green-100 text-green-700', icon: CheckCircle2 },
+    PENDING:  { label: 'Pendente', color: 'bg-yellow-100 text-yellow-700', icon: Clock },
+    REJECTED: { label: 'Rejeitado', color: 'bg-red-100 text-red-700', icon: XCircle },
+    PAUSED:   { label: 'Pausado', color: 'bg-orange-100 text-orange-700', icon: AlertCircle },
+    DISABLED: { label: 'Desativado', color: 'bg-gray-100 text-gray-500', icon: XCircle },
+};
+
+export function CampaignList({ campanhas, templates }: CampaignListProps) {
     const [searchTerm, setSearchTerm] = useState('');
     const [isDeleting, setIsDeleting] = useState<string | null>(null);
     const [isSending, setIsSending] = useState<string | null>(null);
@@ -85,6 +104,32 @@ export function CampaignList({ campanhas }: CampaignListProps) {
 
     return (
         <div className="space-y-6">
+            {/* Templates Status */}
+            {templates.length > 0 && (
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-200/60 p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                        <FileText className="h-4 w-4 text-gray-400" />
+                        <h2 className="text-sm font-bold text-gray-700">Templates WhatsApp</h2>
+                        <span className="text-xs text-gray-400 font-medium">({templates.length})</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {templates.map((t) => {
+                            const cfg = templateStatusConfig[t.status] || { label: t.status, color: 'bg-gray-100 text-gray-500', icon: HelpCircle };
+                            const StatusIcon = cfg.icon;
+                            return (
+                                <div key={t.name} className="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-100 bg-gray-50 text-xs">
+                                    <span className="font-mono font-bold text-gray-700">{t.name}</span>
+                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${cfg.color}`}>
+                                        <StatusIcon className="h-3 w-3" />
+                                        {cfg.label}
+                                    </span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
             {/* Search */}
             <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-200/60">
                 <div className="relative w-full md:w-96">
