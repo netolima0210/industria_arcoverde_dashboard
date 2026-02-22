@@ -3,6 +3,7 @@
 
 import { Edit, MessageCircle, Trash2 } from 'lucide-react';
 import { deleteLead } from '@/app/dashboard/leads/actions';
+import { useRouter } from 'next/navigation';
 
 interface Lead {
     id: string;
@@ -17,6 +18,7 @@ interface LeadsTableProps {
 }
 
 export function LeadsTable({ leads }: LeadsTableProps) {
+    const router = useRouter();
 
     const formatDate = (dateString: string) => {
         return new Date(dateString).toLocaleDateString('pt-BR', {
@@ -98,10 +100,18 @@ export function LeadsTable({ leads }: LeadsTableProps) {
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                     <div className="flex items-center justify-end gap-2">
-                                        <button className="text-gray-400 hover:text-primary transition-colors" title="Ver Conversa">
+                                        <button
+                                            className="text-gray-400 hover:text-primary transition-colors"
+                                            title="Ver Conversa"
+                                            onClick={() => router.push('/dashboard/conversas')}
+                                        >
                                             <MessageCircle className="h-5 w-5" />
                                         </button>
-                                        <button className="text-gray-400 hover:text-primary transition-colors" title="Editar">
+                                        <button
+                                            className="text-gray-400 hover:text-primary transition-colors"
+                                            title="Editar"
+                                            onClick={() => router.push(`/dashboard/leads/${lead.id}/edit`)}
+                                        >
                                             <Edit className="h-5 w-5" />
                                         </button>
                                         <button
