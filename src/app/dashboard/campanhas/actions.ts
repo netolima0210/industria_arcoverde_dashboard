@@ -87,6 +87,23 @@ export async function submitTemplateMeta(formData: FormData) {
         text: bodyText
     });
 
+    // Footer with opt-out question
+    components.push({
+        type: 'FOOTER',
+        text: 'Deseja continuar recebendo ofertas da Indústria Arcoverde?'
+    });
+
+    // Opt-out Quick Reply Button
+    components.push({
+        type: 'BUTTONS',
+        buttons: [
+            {
+                type: 'QUICK_REPLY',
+                text: 'Parar Ofertas'
+            }
+        ]
+    });
+
     const payload = {
         name,
         language,
@@ -261,8 +278,8 @@ export async function sendCampaign(campaignId: string) {
                 .eq(idField, target.id);
         }
 
-        // Rate limit: 1 message per second
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Delay de 15 segundos para evitar banimento (High Quality Messages)
+        await new Promise(resolve => setTimeout(resolve, 15000));
     }
 
     // Final update
