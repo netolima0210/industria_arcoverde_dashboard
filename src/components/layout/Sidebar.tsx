@@ -2,12 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, MessageSquare, Package, Settings, LogOut, Zap } from 'lucide-react';
+import { LayoutDashboard, Users, MessageSquare, Package, Settings, LogOut, Zap, Contact, Megaphone } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/dashboard/leads', label: 'Leads', icon: Users },
+    { href: '/dashboard/vendedores', label: 'Vendedores', icon: Contact },
+    { href: '/dashboard/campanhas', label: 'Campanhas', icon: Megaphone },
     { href: '/dashboard/conversas', label: 'Conversas', icon: MessageSquare },
     { href: '/dashboard/produtos', label: 'Produtos', icon: Package },
     { href: '/dashboard/configuracoes', label: 'Configurações', icon: Settings },
