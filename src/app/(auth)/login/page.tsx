@@ -3,6 +3,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { createClient } from '@/utils/supabase/client';
 import { Lock, Mail, Loader2 } from 'lucide-react';
 
@@ -41,7 +42,16 @@ export default function LoginPage() {
         <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
             <div className="max-w-md w-full bg-white rounded-xl shadow-md overflow-hidden border">
                 <div className="p-8">
-                    <div className="text-center mb-8">
+                    <div className="text-center mb-8 flex flex-col items-center">
+                        <div className="relative h-20 w-20 mb-4 bg-gray-50 rounded-2xl overflow-hidden border border-gray-100 shadow-sm">
+                            <Image
+                                src="/LOGO/logo.jpg"
+                                alt="Indústria Arcoverde Logo"
+                                fill
+                                className="object-cover rotate-90 scale-110"
+                                priority
+                            />
+                        </div>
                         <h1 className="text-2xl font-bold text-primary">Indústria Arcoverde</h1>
                         <p className="text-gray-500 mt-2">Dashboard Administrativo</p>
                     </div>

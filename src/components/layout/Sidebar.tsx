@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, Users, MessageSquare, Package, Settings, LogOut, Zap, Contact, Megaphone } from 'lucide-react';
+import Image from 'next/image';
+import { LayoutDashboard, Users, MessageSquare, Package, Settings, LogOut, Contact, Megaphone } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { cn } from '@/lib/utils';
 
@@ -31,8 +32,14 @@ export function Sidebar() {
         <aside className="w-64 bg-primary h-screen hidden md:flex flex-col fixed left-0 top-0 z-20">
             {/* Logo */}
             <div className="p-6 flex items-center gap-3">
-                <div className="h-10 w-10 bg-white/20 rounded-xl flex items-center justify-center">
-                    <Zap className="h-6 w-6 text-white" />
+                <div className="relative h-10 w-10 flex-shrink-0 bg-white rounded-xl overflow-hidden shadow-sm">
+                    <Image
+                        src="/LOGO/logo.jpg"
+                        alt="Indústria Arcoverde Logo"
+                        fill
+                        className="object-cover rotate-90 scale-110"
+                        priority
+                    />
                 </div>
                 <div>
                     <h1 className="text-lg font-bold text-white leading-tight">Indústria</h1>
