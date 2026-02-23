@@ -9,7 +9,6 @@ import { Lock, Mail, Loader2 } from 'lucide-react';
 export default function LoginPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [isSignUp, setIsSignUp] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [message, setMessage] = useState<string | null>(null);
@@ -23,31 +22,13 @@ export default function LoginPage() {
         setMessage(null);
 
         try {
-            if (isSignUp) {
-                const { data, error } = await supabase.auth.signUp({
-                    email,
-                    password,
-                    options: {
-                        emailRedirectTo: `${location.origin}/auth/callback`,
-                    },
-                });
-                if (error) throw error;
-
-                if (data.session) {
-                    router.push('/dashboard');
-                    router.refresh();
-                } else {
-                    setMessage('Verifique seu email para confirmar o cadastro.');
-                }
-            } else {
-                const { error } = await supabase.auth.signInWithPassword({
-                    email,
-                    password,
-                });
-                if (error) throw error;
-                router.push('/dashboard');
-                router.refresh();
-            }
+            const { error } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+            });
+            if (error) throw error;
+            router.push('/dashboard');
+            router.refresh();
         } catch (err: any) {
             console.error(err);
             setError(err.message || 'Ocorreu um erro ao tentar autenticar.');
@@ -123,28 +104,15 @@ export default function LoginPage() {
                             {loading ? (
                                 <Loader2 className="h-5 w-5 animate-spin" />
                             ) : (
-                                isSignUp ? 'Criar Conta' : 'Entrar'
+                                'Entrar'
                             )}
                         </button>
                     </form>
 
-                    <div className="mt-6 text-center">
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setIsSignUp(!isSignUp);
-                                setError(null);
-                                setMessage(null);
-                            }}
-                            className="text-sm text-primary hover:text-blue-700 font-medium"
-                        >
-                            {isSignUp ? 'Já tem uma conta? Entrar' : 'Não tem conta? Criar acesso de teste'}
-                        </button>
-                    </div>
                 </div>
                 <div className="bg-gray-50 px-8 py-4 border-t text-center">
                     <p className="text-xs text-gray-500">
-                        {isSignUp ? 'Cadastro para ambiente de teste/homologação.' : 'Acesso restrito a colaboradores autorizados.'}
+                        Acesso restrito a colaboradores autorizados.
                     </p>
                 </div>
             </div>
