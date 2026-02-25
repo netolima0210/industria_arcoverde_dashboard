@@ -32,7 +32,7 @@ interface VendedorListProps {
 
 export function VendedorList({ vendedores }: VendedorListProps) {
     const [searchTerm, setSearchTerm] = useState('');
-    const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+    const [viewMode, setViewMode] = useState<string>('grid');
     const [isDeleting, setIsDeleting] = useState<string | null>(null);
     const router = useRouter();
 
@@ -83,7 +83,7 @@ export function VendedorList({ vendedores }: VendedorListProps) {
                         </button>
                         <button
                             onClick={() => setViewMode('list')}
-                            className={`p-1.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-primary' : 'text-gray-400 hover:text-gray-600'}`}
+                            className={`p-1.5 rounded-lg transition-all ${viewMode !== 'grid' ? 'bg-white shadow-sm text-primary' : 'text-gray-400 hover:text-gray-600'}`}
                         >
                             <List className="h-4 w-4" />
                         </button>
@@ -161,7 +161,7 @@ export function VendedorList({ vendedores }: VendedorListProps) {
                     </button>
                     <button
                         onClick={() => setViewMode('list')}
-                        className={`p-1.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-primary' : 'text-gray-400 hover:text-gray-600'}`}
+                        className={`p-1.5 rounded-lg transition-all ${viewMode !== 'grid' ? 'bg-white shadow-sm text-primary' : 'text-gray-400 hover:text-gray-600'}`}
                     >
                         <List className="h-4 w-4" />
                     </button>

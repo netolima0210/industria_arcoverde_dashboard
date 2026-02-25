@@ -1,9 +1,43 @@
 
 import { createClient } from '@/utils/supabase/server';
-import { MessageSquare, CheckCircle, Zap, PhoneIncoming } from 'lucide-react';
+import { MessageSquare, CheckCircle, Zap, PhoneIncoming, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { ConversationsChart } from '@/components/dashboard/ConversationsChart';
 import { DateFilter } from '@/components/dashboard/DateFilter';
 import { startOfMonth, endOfMonth } from 'date-fns';
+
+function TrendBadge({ current, previous, invert = false }: { current: number; previous: number; invert?: boolean }) {
+    if (previous === 0 && current === 0) return <span className="text-xs text-gray-400 mt-1 block">sem dados anteriores</span>;
+
+    let percent: number;
+    if (previous === 0) {
+        percent = 100;
+    } else {
+        percent = ((current - previous) / previous) * 100;
+    }
+
+    const isPositive = percent > 0;
+    const isNeutral = percent === 0;
+    // Para transferências, subir é ruim → invert
+    const isGood = invert ? !isPositive : isPositive;
+
+    if (isNeutral) {
+        return (
+            <span className="flex items-center gap-1 text-xs text-gray-400 mt-1">
+                <Minus className="h-3 w-3" /> igual ao anterior
+            </span>
+        );
+    }
+
+    return (
+        <span className={`flex items-center gap-1 text-xs mt-1 font-medium ${isGood ? 'text-green-600' : 'text-red-500'}`}>
+            {isPositive
+                ? <TrendingUp className="h-3.5 w-3.5" />
+                : <TrendingDown className="h-3.5 w-3.5" />
+            }
+            {isPositive ? '+' : ''}{percent.toFixed(0)}% vs anterior
+        </span>
+    );
+}
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ start_date?: string, end_date?: string, filter?: string }> }) {
     const supabase = await createClient();
@@ -14,7 +48,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     const startDate = params.start_date ? new Date(params.start_date) : startOfMonth(now);
     const endDate = params.end_date ? new Date(params.end_date) : endOfMonth(now);
 
-    // 1. Fetch chat messages filtered by date
+    // Calcular período anterior com a mesma duração
+    const duration = endDate.getTime() - startDate.getTime();
+    const prevStartDate = new Date(startDate.getTime() - duration);
+    const prevEndDate = new Date(startDate.getTime() - 1); // 1ms antes do período atual
+
+    // 1. Fetch chat messages filtered by date (necessário para chart data)
     const { data: chatMessages } = await supabase
         .from('n8n_chat_conversas')
         .select('session_id, created_at, message')
@@ -73,7 +112,54 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString());
 
-    // 3. Chart Data
+    // 3. PERÍODO ANTERIOR — mesmas métricas para comparação de tendência
+    const { data: prevChatMessages } = await supabase
+        .from('n8n_chat_conversas')
+        .select('session_id, created_at, message')
+        .gte('created_at', prevStartDate.toISOString())
+        .lte('created_at', prevEndDate.toISOString());
+
+    const prevSessions = new Map();
+    let prevTotalMensagens = 0;
+    let prevTransferenciasCount = 0;
+
+    if (prevChatMessages) {
+        prevTotalMensagens = prevChatMessages.length;
+
+        prevChatMessages.forEach(msg => {
+            const currentSession = prevSessions.get(msg.session_id) || {
+                has_transfer: false
+            };
+
+            if (msg.message && typeof msg.message === 'object') {
+                const content = (msg.message as any).content?.toLowerCase() || '';
+                const type = (msg.message as any).type;
+
+                if (type === 'ai' && transferKeywords.some(keyword => content.includes(keyword))) {
+                    currentSession.has_transfer = true;
+                }
+            }
+
+            prevSessions.set(msg.session_id, currentSession);
+        });
+    }
+
+    const prevTotalConversas = prevSessions.size;
+    prevSessions.forEach((session) => {
+        if (session.has_transfer) prevTransferenciasCount++;
+    });
+
+    const prevTaxaResolucao = prevTotalConversas > 0
+        ? ((prevTotalConversas - prevTransferenciasCount) / prevTotalConversas * 100)
+        : 0;
+
+    const { count: prevNovosLeads } = await supabase
+        .from('clientes')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', prevStartDate.toISOString())
+        .lte('created_at', prevEndDate.toISOString());
+
+    // 4. Chart Data
     const diffDays = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
     const isDailyChart = diffDays > 1.5;
 
@@ -130,6 +216,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             icon: Zap,
             color: 'bg-blue-500',
             iconColor: 'text-white',
+            current: totalConversas,
+            previous: prevTotalConversas,
+            invert: false,
         },
         {
             label: 'Resolução Bot',
@@ -138,6 +227,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             icon: CheckCircle,
             color: 'bg-green-500',
             iconColor: 'text-white',
+            current: parseFloat(taxaResolucao),
+            previous: prevTaxaResolucao,
+            invert: false,
         },
         {
             label: 'Transferências',
@@ -146,6 +238,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             icon: PhoneIncoming,
             color: 'bg-orange-500',
             iconColor: 'text-white',
+            current: transferenciasCount,
+            previous: prevTransferenciasCount,
+            invert: true,
         },
         {
             label: 'Mensagens',
@@ -154,6 +249,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             icon: MessageSquare,
             color: 'bg-purple-500',
             iconColor: 'text-white',
+            current: totalMensagens,
+            previous: prevTotalMensagens,
+            invert: false,
         },
     ];
 
@@ -190,7 +288,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                             <h3 className="text-sm font-medium text-gray-500">{m.label}</h3>
                         </div>
                         <p className="text-3xl font-bold text-gray-900">{m.value}</p>
-                        <span className="text-xs text-gray-400 mt-1 block">{m.sub}</span>
+                        <TrendBadge current={m.current} previous={m.previous} invert={m.invert} />
                     </div>
                 ))}
             </div>
@@ -222,7 +320,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                         </div>
                         <div className="flex justify-between items-center p-4 bg-gray-50 rounded-xl">
                             <span className="text-sm font-medium text-gray-600">Novos Leads</span>
-                            <span className="font-bold text-gray-900 text-lg">{novosLeads || 0}</span>
+                            <div className="text-right">
+                                <span className="font-bold text-gray-900 text-lg">{novosLeads || 0}</span>
+                                <TrendBadge current={novosLeads || 0} previous={prevNovosLeads || 0} />
+                            </div>
                         </div>
                         <div className="flex justify-between items-center p-4 bg-gray-50 rounded-xl">
                             <span className="text-sm font-medium text-gray-600">Média Msgs/Conversa</span>

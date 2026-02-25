@@ -1,11 +1,12 @@
 'use client';
 
-import { Bell, CheckCircle, UserPlus, X } from 'lucide-react';
+import { Bell, CheckCircle, UserPlus, X, Menu } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useSidebar } from './SidebarContext';
 
 type Notificacao = {
     id: string;
@@ -22,6 +23,7 @@ export function Header() {
     const [hasUnread, setHasUnread] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const supabase = createClient();
+    const { toggle } = useSidebar();
 
     const fetchNotifications = async () => {
         try {
@@ -60,7 +62,7 @@ export function Header() {
                     tipo: 'campanha',
                     titulo: 'Campanha Concluída',
                     mensagem: `A campanha "${c.nome}" terminou de ser enviada.`,
-                    data: c.created_at, // O ideal seria 'updated_at', mas created_at funciona como fallback
+                    data: c.created_at,
                     link: `/dashboard/campanhas`
                 }));
                 arr = [...arr, ...campNotif];
@@ -130,7 +132,19 @@ export function Header() {
     };
 
     return (
-        <header className="h-16 bg-white border-b border-gray-200/80 flex items-center justify-end px-6 fixed top-0 right-0 left-0 md:left-64 z-10">
+        <header className="h-16 bg-white border-b border-gray-200/80 flex items-center justify-between px-4 sm:px-6 fixed top-0 right-0 left-0 md:left-64 z-10">
+            {/* Hamburger button - mobile only */}
+            <button
+                onClick={toggle}
+                className="md:hidden p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors focus:outline-none"
+                aria-label="Abrir menu"
+            >
+                <Menu className="h-6 w-6" />
+            </button>
+
+            {/* Spacer for desktop (where hamburger is hidden) */}
+            <div className="hidden md:block" />
+
             <div className="flex items-center gap-3">
                 <div className="relative" ref={dropdownRef}>
                     <button

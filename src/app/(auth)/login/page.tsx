@@ -48,7 +48,7 @@ export default function LoginPage() {
                                 src="/LOGO/logo.jpg"
                                 alt="Indústria Arcoverde Logo"
                                 fill
-                                className="object-cover rotate-90 scale-110"
+                                className="object-contain"
                                 priority
                             />
                         </div>
