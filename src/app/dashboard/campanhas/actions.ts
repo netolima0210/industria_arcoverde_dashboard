@@ -140,15 +140,20 @@ async function uploadMediaToMeta(file: File): Promise<{ handle?: string; error?:
     }
 
     try {
-        // Garantir que o nome tenha a extensão correta caso seja PDF
-        let fileName = file.name;
-        if (file.type === 'application/pdf' && !fileName.toLowerCase().endsWith('.pdf')) {
-            fileName += '.pdf';
+        // Garantir um nome de arquivo limpo e sem caracteres especiais para evitar "Invalid parameter" na Meta.
+        // O nome real será definido no envio da mensagem se necessário, aqui é só para o Resumable Upload API.
+        let safeFileName = 'midia_campanha';
+        if (file.type === 'application/pdf') {
+            safeFileName += '.pdf';
+        } else if (file.type === 'image/jpeg') {
+            safeFileName += '.jpg';
+        } else if (file.type === 'image/png') {
+            safeFileName += '.png';
         }
 
         // Step 1: Create upload session
         const sessionResponse = await fetch(
-            `${META_API_URL}/${appId}/uploads?file_name=${encodeURIComponent(fileName)}&file_length=${file.size}&file_type=${encodeURIComponent(file.type)}`,
+            `${META_API_URL}/${appId}/uploads?file_name=${safeFileName}&file_length=${file.size}&file_type=${encodeURIComponent(file.type)}`,
             {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` }
