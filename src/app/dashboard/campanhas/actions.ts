@@ -140,9 +140,15 @@ async function uploadMediaToMeta(file: File): Promise<{ handle?: string; error?:
     }
 
     try {
+        // Garantir que o nome tenha a extensão correta caso seja PDF
+        let fileName = file.name;
+        if (file.type === 'application/pdf' && !fileName.toLowerCase().endsWith('.pdf')) {
+            fileName += '.pdf';
+        }
+
         // Step 1: Create upload session
         const sessionResponse = await fetch(
-            `${META_API_URL}/${appId}/uploads?file_name=${encodeURIComponent(file.name)}&file_length=${file.size}&file_type=${encodeURIComponent(file.type)}`,
+            `${META_API_URL}/${appId}/uploads?file_name=${encodeURIComponent(fileName)}&file_length=${file.size}&file_type=${encodeURIComponent(file.type)}`,
             {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` }

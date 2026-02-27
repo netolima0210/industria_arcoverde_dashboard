@@ -11,7 +11,7 @@ export default async function LeadsPage() {
     const { data: leads, error } = await supabase
         .from('clientes')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('nome', { ascending: true });
 
     return (
         <div className="space-y-6">
