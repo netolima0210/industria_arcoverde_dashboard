@@ -2,7 +2,6 @@
 
 import { createClient } from '@/utils/supabase/server';
 import { revalidatePath } from 'next/cache';
-import { redirect } from 'next/navigation';
 
 const META_API_URL = 'https://graph.facebook.com/v21.0';
 
@@ -62,7 +61,7 @@ export async function dispatchCampaign(formData: FormData) {
         const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
         const filePath = `campanhas/${fileName}`;
 
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        const { error: uploadError } = await supabase.storage
             .from('campanhas')
             .upload(filePath, mediaFile);
 
@@ -140,20 +139,30 @@ async function uploadMediaToMeta(file: File): Promise<{ handle?: string; error?:
     }
 
     try {
-        // Garantir um nome de arquivo limpo e sem caracteres especiais para evitar "Invalid parameter" na Meta.
-        // O nome real será definido no envio da mensagem se necessário, aqui é só para o Resumable Upload API.
+        // Detectar o MIME type correto a partir da extensão do arquivo como fallback,
+        // pois em alguns ambientes de produção o file.type pode vir como 'application/octet-stream' ou vazio.
+        let mimeType = file.type;
+        if (!mimeType || mimeType === 'application/octet-stream') {
+            const ext = file.name.split('.').pop()?.toLowerCase();
+            if (ext === 'pdf') mimeType = 'application/pdf';
+            else if (ext === 'jpg' || ext === 'jpeg') mimeType = 'image/jpeg';
+            else if (ext === 'png') mimeType = 'image/png';
+        }
+
+        // Nome seguro sem caracteres especiais para evitar "Invalid parameter" na Meta.
         let safeFileName = 'midia_campanha';
-        if (file.type === 'application/pdf') {
+        if (mimeType === 'application/pdf') {
             safeFileName += '.pdf';
-        } else if (file.type === 'image/jpeg') {
+        } else if (mimeType === 'image/jpeg') {
             safeFileName += '.jpg';
-        } else if (file.type === 'image/png') {
+        } else if (mimeType === 'image/png') {
             safeFileName += '.png';
         }
 
         // Step 1: Create upload session
+        // IMPORTANTE: a Meta espera o file_type SEM encoding do '/' (ex: application/pdf, não application%2Fpdf).
         const sessionResponse = await fetch(
-            `${META_API_URL}/${appId}/uploads?file_name=${safeFileName}&file_length=${file.size}&file_type=${encodeURIComponent(file.type)}`,
+            `${META_API_URL}/${appId}/uploads?file_name=${safeFileName}&file_length=${file.size}&file_type=${mimeType}`,
             {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -179,7 +188,7 @@ async function uploadMediaToMeta(file: File): Promise<{ handle?: string; error?:
                 headers: {
                     'Authorization': `OAuth ${token}`,
                     'file_offset': '0',
-                    'Content-Type': file.type,
+                    'Content-Type': mimeType,
                 },
                 body: fileBuffer
             }
