@@ -466,8 +466,8 @@ export default function CampanhasPage() {
                         {/* Pending / rejected section */}
                         {!loading && pendingTemplates.length > 0 && (
                             <>
-                                <div className="px-5 py-2.5 border-t border-gray-100 bg-gray-50/60">
-                                    <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Em análise / Rejeitados</p>
+                                <div className="px-5 py-2.5 border-t border-gray-100 bg-gray-50/60 flex items-center">
+                                    <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Em análise / Rejeitados</span>
                                 </div>
                                 <ul className="divide-y divide-gray-50">
                                     {pendingTemplates.map((tpl, i) => (
@@ -476,10 +476,12 @@ export default function CampanhasPage() {
                                                 <p className="text-sm font-medium text-gray-700">{tpl.name}</p>
                                                 <p className="text-[11px] text-gray-400 uppercase font-medium tracking-wide">{tpl.category} · {tpl.language}</p>
                                             </div>
-                                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${getStatus(tpl.status).classes}`}>
-                                                {getStatus(tpl.status).icon}
-                                                {getStatus(tpl.status).label}
-                                            </span>
+                                            <div className="flex items-center gap-2">
+                                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${getStatus(tpl.status).classes}`}>
+                                                    {getStatus(tpl.status).icon}
+                                                    {getStatus(tpl.status).label}
+                                                </span>
+                                            </div>
                                         </li>
                                     ))}
                                 </ul>
