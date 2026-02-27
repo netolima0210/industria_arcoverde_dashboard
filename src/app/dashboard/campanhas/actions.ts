@@ -63,7 +63,7 @@ export async function dispatchCampaign(formData: FormData) {
         const filePath = `campanhas/${fileName}`;
 
         const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('campanhas-midia')
+            .from('campanhas')
             .upload(filePath, mediaFile);
 
         if (uploadError) {
@@ -73,10 +73,21 @@ export async function dispatchCampaign(formData: FormData) {
 
         // Get public URL
         const { data: { publicUrl } } = supabase.storage
-            .from('campanhas-midia')
+            .from('campanhas')
             .getPublicUrl(filePath);
 
-        imagem_url = publicUrl;
+        // Force original supabase URL to avoid Meta rejecting custom domains
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+        if (supabaseUrl && publicUrl.startsWith(supabaseUrl)) {
+            imagem_url = publicUrl;
+        } else if (supabaseUrl) {
+            const urlObj = new URL(publicUrl);
+            const originalUrlObj = new URL(supabaseUrl);
+            urlObj.hostname = originalUrlObj.hostname;
+            imagem_url = urlObj.toString();
+        } else {
+            imagem_url = publicUrl;
+        }
     }
 
     // Create the campaign record
@@ -119,6 +130,64 @@ export async function deleteCampaign(id: string) {
     revalidatePath('/dashboard/campanhas');
 }
 
+// ─── Upload Media to Meta (Resumable Upload API) ──
+async function uploadMediaToMeta(file: File): Promise<{ handle?: string; error?: string }> {
+    const token = process.env.META_WHATSAPP_TOKEN;
+    const appId = process.env.META_APP_ID;
+
+    if (!token || !appId) {
+        return { error: 'META_APP_ID ou META_WHATSAPP_TOKEN não configurados.' };
+    }
+
+    try {
+        // Step 1: Create upload session
+        const sessionResponse = await fetch(
+            `${META_API_URL}/${appId}/uploads?file_name=${encodeURIComponent(file.name)}&file_length=${file.size}&file_type=${encodeURIComponent(file.type)}`,
+            {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            }
+        );
+
+        const sessionData = await sessionResponse.json();
+
+        if (!sessionResponse.ok || !sessionData.id) {
+            console.error('Meta Upload Session error:', sessionData);
+            return { error: sessionData.error?.message || 'Erro ao criar sessão de upload na Meta.' };
+        }
+
+        const uploadSessionId = sessionData.id; // format: "upload:<ID>"
+
+        // Step 2: Upload the file binary data
+        const fileBuffer = Buffer.from(await file.arrayBuffer());
+
+        const uploadResponse = await fetch(
+            `${META_API_URL}/${uploadSessionId}`,
+            {
+                method: 'POST',
+                headers: {
+                    'Authorization': `OAuth ${token}`,
+                    'file_offset': '0',
+                    'Content-Type': file.type,
+                },
+                body: fileBuffer
+            }
+        );
+
+        const uploadData = await uploadResponse.json();
+
+        if (!uploadResponse.ok || !uploadData.h) {
+            console.error('Meta File Upload error:', uploadData);
+            return { error: uploadData.error?.message || 'Erro ao fazer upload do arquivo na Meta.' };
+        }
+
+        return { handle: uploadData.h };
+    } catch (err) {
+        console.error('Meta Upload error:', err);
+        return { error: 'Falha na comunicação com a API de upload da Meta.' };
+    }
+}
+
 // ─── Submit Template to Meta ──────────────────────
 export async function submitTemplateMeta(formData: FormData) {
     const token = process.env.META_WHATSAPP_TOKEN;
@@ -135,13 +204,22 @@ export async function submitTemplateMeta(formData: FormData) {
 
     const components: any[] = [];
 
-    // Header (optional image or document)
-    if (headerType === 'IMAGE' || headerType === 'DOCUMENT') {
+    // Handle Media Upload to Meta if file is present
+    const headerFile = formData.get('header_file') as File | null;
+    if (headerFile && headerFile.size > 0 && (headerType === 'IMAGE' || headerType === 'DOCUMENT')) {
+        // Upload the file directly to Meta to get a handle
+        const uploadResult = await uploadMediaToMeta(headerFile);
+
+        if (uploadResult.error) {
+            return { error: uploadResult.error };
+        }
+
+        // Add HEADER component with the handle
         components.push({
             type: 'HEADER',
             format: headerType,
             example: {
-                header_handle: [] // Meta will use the uploaded media
+                header_handle: [uploadResult.handle!]
             }
         });
     }

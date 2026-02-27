@@ -334,6 +334,7 @@ export default function CampanhasPage() {
                         <div className="bg-[#E5DDD5] rounded-xl p-4 min-h-[260px] flex flex-col gap-1 shadow-inner">
                             <div className="bg-white rounded-lg shadow-sm max-w-[92%] space-y-2 relative pb-6 border border-gray-100 overflow-hidden">
 
+
                                 {/* Header preview */}
                                 {headerType === 'IMAGE' && (
                                     headerPreviewUrl ? (
