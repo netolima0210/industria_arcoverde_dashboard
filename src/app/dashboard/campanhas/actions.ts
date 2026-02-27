@@ -172,17 +172,22 @@ async function uploadMediaToMeta(file: File): Promise<{ handle?: string; error?:
         const sessionData = await sessionResponse.json();
 
         if (!sessionResponse.ok || !sessionData.id) {
-            console.error('Meta Upload Session error:', sessionData);
-            return { error: sessionData.error?.message || 'Erro ao criar sessão de upload na Meta.' };
+            console.error('[PASSO 1] Meta Upload Session error:', JSON.stringify(sessionData));
+            const msg = sessionData.error?.message || 'Erro ao criar sessão de upload na Meta.';
+            const code = sessionData.error?.code ? ` (código ${sessionData.error.code})` : '';
+            return { error: `[Passo 1 - Sessão] ${msg}${code}` };
         }
 
         const uploadSessionId = sessionData.id; // format: "upload:<ID>"
+        console.log('[PASSO 1] Upload session criada:', uploadSessionId);
 
         // Step 2: Upload the file binary data
+        // O endpoint do upload NÃO usa o prefixo de versão (v21.0) no upload session ID.
         const fileBuffer = Buffer.from(await file.arrayBuffer());
+        const uploadUrl = `https://graph.facebook.com/${uploadSessionId}`;
 
         const uploadResponse = await fetch(
-            `${META_API_URL}/${uploadSessionId}`,
+            uploadUrl,
             {
                 method: 'POST',
                 headers: {
@@ -197,9 +202,13 @@ async function uploadMediaToMeta(file: File): Promise<{ handle?: string; error?:
         const uploadData = await uploadResponse.json();
 
         if (!uploadResponse.ok || !uploadData.h) {
-            console.error('Meta File Upload error:', uploadData);
-            return { error: uploadData.error?.message || 'Erro ao fazer upload do arquivo na Meta.' };
+            console.error('[PASSO 2] Meta File Upload error:', JSON.stringify(uploadData));
+            const msg = uploadData.error?.message || 'Erro ao fazer upload do arquivo na Meta.';
+            const code = uploadData.error?.code ? ` (código ${uploadData.error.code})` : '';
+            return { error: `[Passo 2 - Upload] ${msg}${code}` };
         }
+
+        console.log('[PASSO 2] Upload concluído, handle recebido.');
 
         return { handle: uploadData.h };
     } catch (err) {
@@ -287,8 +296,11 @@ export async function submitTemplateMeta(formData: FormData) {
         const data = await response.json();
 
         if (!response.ok) {
-            console.error('Meta API error:', data);
-            return { error: data.error?.message || 'Erro ao enviar template para a Meta.' };
+            console.error('[PASSO 3] Meta Template error:', JSON.stringify(data));
+            const msg = data.error?.message || 'Erro ao enviar template para a Meta.';
+            const code = data.error?.code ? ` (código ${data.error.code})` : '';
+            const subcode = data.error?.error_subcode ? `, subcódigo ${data.error.error_subcode}` : '';
+            return { error: `[Passo 3 - Template] ${msg}${code}${subcode}` };
         }
 
         return { success: true, templateId: data.id, templateName: name, status: data.status };
