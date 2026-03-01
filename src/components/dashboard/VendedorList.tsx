@@ -24,6 +24,8 @@ interface Vendedor {
     endereco: string | null;
     regiao_atende: string | null;
     cidades_atende: string | null;
+    status?: string | null;
+    created_at?: string;
 }
 
 interface VendedorListProps {
@@ -32,16 +34,29 @@ interface VendedorListProps {
 
 export function VendedorList({ vendedores }: VendedorListProps) {
     const [searchTerm, setSearchTerm] = useState('');
+    const [dateFilter, setDateFilter] = useState('');
     const [viewMode, setViewMode] = useState<string>('grid');
     const [isDeleting, setIsDeleting] = useState<string | null>(null);
     const router = useRouter();
 
     const filteredVendedores = vendedores.filter(v => {
-        const search = searchTerm.toLowerCase();
-        return v.nome.toLowerCase().includes(search) ||
-            v.email?.toLowerCase().includes(search) ||
-            v.regiao_atende?.toLowerCase().includes(search) ||
-            v.cidades_atende?.toLowerCase().includes(search);
+        let matchSearch = true;
+        let matchDate = true;
+
+        if (searchTerm) {
+            const search = searchTerm.toLowerCase();
+            matchSearch = v.nome.toLowerCase().includes(search) ||
+                v.email?.toLowerCase().includes(search) ||
+                v.regiao_atende?.toLowerCase().includes(search) ||
+                v.cidades_atende?.toLowerCase().includes(search);
+        }
+
+        if (dateFilter && v.created_at) {
+            const rowDate = new Date(v.created_at).toISOString().split('T')[0];
+            matchDate = rowDate === dateFilter;
+        }
+
+        return matchSearch && matchDate;
     });
 
     const handleDelete = async (id: string, name: string) => {
@@ -58,20 +73,55 @@ export function VendedorList({ vendedores }: VendedorListProps) {
         }
     };
 
+    const statusColors: Record<string, string> = {
+        'ativo': 'bg-green-100 text-green-800',
+        'inativo': 'bg-gray-100 text-gray-800',
+    };
+
+    const handleStatusChange = async (id: string, newStatus: string) => {
+        try {
+            // Import dinâmico para evitar warning de unused antes da edição e manter limpo
+            const { updateVendedorStatus } = await import('@/app/dashboard/vendedores/actions');
+            const result = await updateVendedorStatus(id, newStatus);
+            if (result && result.error) {
+                alert(result.error);
+            }
+        } catch (error) {
+            console.error('Failed to update status', error);
+            alert('Erro ao atualizar status');
+        }
+    };
+
     if (viewMode === 'grid') {
         return (
             <div className="space-y-6">
                 {/* Filters Bar */}
                 <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-200/60 flex flex-col md:flex-row gap-4 items-center justify-between">
-                    <div className="relative w-full md:w-96">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                        <input
-                            type="text"
-                            placeholder="Buscar vendedores..."
-                            className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
+                    <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto flex-1">
+                        <div className="relative w-full sm:w-64">
+                            <label htmlFor="search-grid" className="block text-sm font-medium text-gray-700 mb-1">Buscar vendedor</label>
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                <input
+                                    id="search-grid"
+                                    type="text"
+                                    placeholder="Nome, e-mail, região..."
+                                    className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                        <div className="w-full sm:w-64">
+                            <label htmlFor="date-grid" className="block text-sm font-medium text-gray-700 mb-1">Filtrar por data</label>
+                            <input
+                                id="date-grid"
+                                type="date"
+                                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                                value={dateFilter}
+                                onChange={(e) => setDateFilter(e.target.value)}
+                            />
+                        </div>
                     </div>
 
                     <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl p-1">
@@ -107,7 +157,17 @@ export function VendedorList({ vendedores }: VendedorListProps) {
                                 </button>
                             </div>
 
-                            <h3 className="font-bold text-gray-900 mb-1 group-hover:text-primary transition-colors">{v.nome}</h3>
+                            <div className="flex items-center justify-between mb-1">
+                                <h3 className="font-bold text-gray-900 group-hover:text-primary transition-colors">{v.nome}</h3>
+                                <select
+                                    value={v.status?.toLowerCase() || 'ativo'}
+                                    onChange={(e) => handleStatusChange(v.id, e.target.value)}
+                                    className={`px-2 py-0.5 text-[10px] leading-5 font-bold rounded-full outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary border border-transparent hover:border-gray-200 cursor-pointer transition-all ${statusColors[v.status?.toLowerCase() || ''] || 'bg-green-100 text-green-800'}`}
+                                >
+                                    <option value="ativo" className="bg-white text-gray-900">Ativo</option>
+                                    <option value="inativo" className="bg-white text-gray-900">Inativo</option>
+                                </select>
+                            </div>
                             <p className="text-xs text-primary font-medium mb-4">{v.regiao_atende || 'Região não informada'}</p>
 
                             <div className="space-y-3 pt-4 border-t border-gray-50">
@@ -141,15 +201,31 @@ export function VendedorList({ vendedores }: VendedorListProps) {
         <div className="space-y-6">
             {/* Filters Bar */}
             <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-200/60 flex flex-col md:flex-row gap-4 items-center justify-between">
-                <div className="relative w-full md:w-96">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <input
-                        type="text"
-                        placeholder="Buscar vendedores..."
-                        className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
+                <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto flex-1">
+                    <div className="relative w-full sm:w-64">
+                        <label htmlFor="search-list" className="block text-sm font-medium text-gray-700 mb-1">Buscar vendedor</label>
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                            <input
+                                id="search-list"
+                                type="text"
+                                placeholder="Nome, e-mail, região..."
+                                className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                    <div className="w-full sm:w-64">
+                        <label htmlFor="date-list" className="block text-sm font-medium text-gray-700 mb-1">Filtrar por data</label>
+                        <input
+                            id="date-list"
+                            type="date"
+                            className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                            value={dateFilter}
+                            onChange={(e) => setDateFilter(e.target.value)}
+                        />
+                    </div>
                 </div>
 
                 <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl p-1">
@@ -177,6 +253,7 @@ export function VendedorList({ vendedores }: VendedorListProps) {
                                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Vendedor</th>
                                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Contato</th>
                                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Região / Cidades</th>
+                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
                                 <th className="relative px-6 py-4"><span className="sr-only">Ações</span></th>
                             </tr>
                         </thead>
@@ -208,6 +285,16 @@ export function VendedorList({ vendedores }: VendedorListProps) {
                                             <div className="font-medium text-gray-700">{v.regiao_atende || '—'}</div>
                                             <div className="text-[10px] text-gray-400 truncate max-w-[200px]">{v.cidades_atende || '—'}</div>
                                         </div>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <select
+                                            value={v.status?.toLowerCase() || 'ativo'}
+                                            onChange={(e) => handleStatusChange(v.id, e.target.value)}
+                                            className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary border border-transparent hover:border-gray-200 cursor-pointer transition-all ${statusColors[v.status?.toLowerCase() || ''] || 'bg-green-100 text-green-800'}`}
+                                        >
+                                            <option value="ativo" className="bg-white text-gray-900">Ativo</option>
+                                            <option value="inativo" className="bg-white text-gray-900">Inativo</option>
+                                        </select>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-right">
                                         <div className="flex justify-end gap-2">

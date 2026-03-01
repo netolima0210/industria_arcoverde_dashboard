@@ -47,3 +47,17 @@ export async function deleteVendedor(id: string) {
 
     revalidatePath('/dashboard/vendedores');
 }
+
+export async function updateVendedorStatus(id: string, newStatus: string) {
+    const supabase = await createClient();
+
+    const { error } = await supabase.from('vendedores').update({ status: newStatus }).eq('id', id);
+
+    if (error) {
+        console.error('Error updating vendedor status:', error);
+        return { error: 'Erro ao atualizar status do vendedor.' };
+    }
+
+    revalidatePath('/dashboard/vendedores');
+    return { success: true };
+}

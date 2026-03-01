@@ -2,7 +2,7 @@
 'use client';
 
 import { Edit, MessageCircle, Trash2 } from 'lucide-react';
-import { deleteLead } from '@/app/dashboard/leads/actions';
+import { deleteLead, updateLeadStatus } from '@/app/dashboard/leads/actions';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
@@ -21,12 +21,22 @@ interface LeadsTableProps {
 export function LeadsTable({ leads }: LeadsTableProps) {
     const router = useRouter();
     const [dateFilter, setDateFilter] = useState('');
+    const [nameFilter, setNameFilter] = useState('');
 
     const filteredLeads = leads.filter(lead => {
-        if (!dateFilter) return true;
-        // Pega apenas a parte da data (YYYY-MM-DD) do created_at
-        const leadDate = new Date(lead.created_at).toISOString().split('T')[0];
-        return leadDate === dateFilter;
+        let matchDate = true;
+        let matchName = true;
+
+        if (dateFilter) {
+            const leadDate = new Date(lead.created_at).toISOString().split('T')[0];
+            matchDate = leadDate === dateFilter;
+        }
+
+        if (nameFilter) {
+            matchName = lead.nome.toLowerCase().includes(nameFilter.toLowerCase());
+        }
+
+        return matchDate && matchName;
     });
 
     const formatDate = (dateString: string) => {
@@ -46,6 +56,7 @@ export function LeadsTable({ leads }: LeadsTableProps) {
         'venda_fechada': 'bg-green-100 text-green-800',
         'perdido': 'bg-red-100 text-red-800',
         'ativo': 'bg-green-100 text-green-800',
+        'inativo': 'bg-gray-100 text-gray-800',
     };
 
     const handleDelete = async (id: string) => {
@@ -54,9 +65,32 @@ export function LeadsTable({ leads }: LeadsTableProps) {
         }
     };
 
+    const handleStatusChange = async (id: string, newStatus: string) => {
+        try {
+            const result = await updateLeadStatus(id, newStatus);
+            if (result && result.error) {
+                alert(result.error);
+            }
+        } catch (error) {
+            console.error('Failed to update status', error);
+            alert('Erro ao atualizar status');
+        }
+    };
+
     return (
         <div className="space-y-4">
-            <div className="flex justify-end">
+            <div className="flex flex-col sm:flex-row justify-end gap-4">
+                <div className="w-full sm:w-64">
+                    <label htmlFor="name-filter" className="block text-sm font-medium text-gray-700 mb-1">Buscar por nome</label>
+                    <input
+                        type="text"
+                        id="name-filter"
+                        value={nameFilter}
+                        onChange={(e) => setNameFilter(e.target.value)}
+                        placeholder="Nome do lead..."
+                        className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm outline-none"
+                    />
+                </div>
                 <div className="w-full sm:w-64">
                     <label htmlFor="date-filter" className="block text-sm font-medium text-gray-700 mb-1">Filtrar por data de cadastro</label>
                     <input
@@ -117,9 +151,19 @@ export function LeadsTable({ leads }: LeadsTableProps) {
                                         <div className="text-sm text-gray-500">{formatDate(lead.created_at)}</div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColors[lead.status?.toLowerCase() || ''] || 'bg-gray-100 text-gray-800'}`}>
-                                            {lead.status}
-                                        </span>
+                                        <select
+                                            value={lead.status?.toLowerCase() || 'novo'}
+                                            onChange={(e) => handleStatusChange(lead.id, e.target.value)}
+                                            className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary border border-transparent hover:border-gray-200 cursor-pointer transition-all ${statusColors[lead.status?.toLowerCase() || ''] || 'bg-gray-100 text-gray-800'}`}
+                                        >
+                                            <option value="novo" className="bg-white text-gray-900">Novo</option>
+                                            <option value="contatado" className="bg-white text-gray-900">Contatado</option>
+                                            <option value="cotacao_enviada" className="bg-white text-gray-900">Cotação Enviada</option>
+                                            <option value="venda_fechada" className="bg-white text-gray-900">Venda Fechada</option>
+                                            <option value="perdido" className="bg-white text-gray-900">Perdido</option>
+                                            <option value="ativo" className="bg-white text-gray-900">Ativo</option>
+                                            <option value="inativo" className="bg-white text-gray-900">Inativo</option>
+                                        </select>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                         <div className="flex items-center justify-end gap-2">

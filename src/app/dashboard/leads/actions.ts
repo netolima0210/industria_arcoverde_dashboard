@@ -64,3 +64,17 @@ export async function deleteLead(id: string) {
 
     revalidatePath('/dashboard/leads');
 }
+
+export async function updateLeadStatus(id: string, newStatus: string) {
+    const supabase = await createClient();
+
+    const { error } = await supabase.from('clientes').update({ status: newStatus }).eq('id', id);
+
+    if (error) {
+        console.error('Error updating lead status:', error);
+        return { error: 'Erro ao atualizar status do lead.' };
+    }
+
+    revalidatePath('/dashboard/leads');
+    return { success: true };
+}
