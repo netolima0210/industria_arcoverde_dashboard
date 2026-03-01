@@ -46,9 +46,9 @@ export function VendedorList({ vendedores }: VendedorListProps) {
         if (searchTerm) {
             const search = searchTerm.toLowerCase();
             matchSearch = v.nome.toLowerCase().includes(search) ||
-                v.email?.toLowerCase().includes(search) ||
-                v.regiao_atende?.toLowerCase().includes(search) ||
-                v.cidades_atende?.toLowerCase().includes(search);
+                v.email?.toLowerCase().includes(search) === true ||
+                v.regiao_atende?.toLowerCase().includes(search) === true ||
+                v.cidades_atende?.toLowerCase().includes(search) === true;
         }
 
         if (dateFilter && v.created_at) {
