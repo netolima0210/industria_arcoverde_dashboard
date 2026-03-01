@@ -20,7 +20,7 @@ export async function createCampaign(formData: FormData) {
 
     // Count targets
     const table = publico_alvo === 'leads' ? 'clientes' : 'vendedores';
-    const { count } = await supabase.from(table).select('*', { count: 'exact', head: true });
+    const { count } = await supabase.from(table).select('*', { count: 'exact', head: true }).eq('status', 'ativo');
 
     const { data: campaign, error } = await supabase.from('campanhas').insert({
         nome,
@@ -366,10 +366,10 @@ export async function sendCampaign(campaignId: string) {
     let targets: { id: string; phone: string | null }[] = [];
 
     if (isLeads) {
-        const { data } = await supabase.from('clientes').select('id, contato');
+        const { data } = await supabase.from('clientes').select('id, contato').eq('status', 'ativo');
         targets = (data || []).map((t) => ({ id: t.id, phone: t.contato }));
     } else {
-        const { data } = await supabase.from('vendedores').select('id, telefone');
+        const { data } = await supabase.from('vendedores').select('id, telefone').eq('status', 'ativo');
         targets = (data || []).map((t) => ({ id: t.id, phone: t.telefone }));
     }
 
