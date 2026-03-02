@@ -445,8 +445,17 @@ export async function sendCampaign(campaignId: string) {
                     .eq(idField, target.id);
             } else {
                 erros++;
+                // Log completo para diagnóstico — visível nos logs da Vercel
+                console.error('[sendCampaign] Meta API error:', JSON.stringify({
+                    phoneId,
+                    to: fullPhone,
+                    template: campaign.mensagem,
+                    error: data.error
+                }));
+                const errCode = data.error?.code ? ` [código ${data.error.code}]` : '';
+                const errMsg = data.error?.message || 'Erro desconhecido';
                 await supabase.from('campanhas_envios')
-                    .update({ status: 'erro', mensagem_erro: data.error?.message || 'Erro desconhecido' })
+                    .update({ status: 'erro', mensagem_erro: `${errMsg}${errCode}` })
                     .eq('campanha_id', campaignId)
                     .eq(idField, target.id);
             }
