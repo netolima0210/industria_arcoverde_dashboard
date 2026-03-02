@@ -187,16 +187,21 @@ export default function CampanhasPage() {
         formData.set('template_name', dispatchingTemplate.name);
         formData.set('audience', audience);
 
-        const result = await dispatchCampaign(formData);
+        try {
+            const result = await dispatchCampaign(formData);
 
-        setIsSendingCampaign(false);
-        setDispatchingTemplate(null);
-
-        if (result.error) {
-            alert(`Erro: ${result.error}`);
-        } else {
-            alert(`Campanha disparada com sucesso para ${audience.toUpperCase()}!`);
-            fetchCampanhas();
+            if (result.error) {
+                alert(`Erro: ${result.error}`);
+            } else {
+                alert(`Campanha disparada com sucesso para ${audience.toUpperCase()}!`);
+                await fetchCampanhas();
+            }
+        } catch (error) {
+            console.error('Falha ao disparar campanha', error);
+            alert('Falha crítica ao disparar campanha.');
+        } finally {
+            setIsSendingCampaign(false);
+            setDispatchingTemplate(null);
         }
     };
 

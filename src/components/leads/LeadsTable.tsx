@@ -2,7 +2,7 @@
 'use client';
 
 import { Edit, MessageCircle, Trash2 } from 'lucide-react';
-import { deleteLead, updateLeadStatus } from '@/app/dashboard/leads/actions';
+import { deleteLead, updateLeadStatus, updateMultipleLeadsStatus } from '@/app/dashboard/leads/actions';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
@@ -22,6 +22,7 @@ export function LeadsTable({ leads }: LeadsTableProps) {
     const router = useRouter();
     const [dateFilter, setDateFilter] = useState('');
     const [nameFilter, setNameFilter] = useState('');
+    const [isUpdatingBulk, setIsUpdatingBulk] = useState(false);
 
     const filteredLeads = leads.filter(lead => {
         let matchDate = true;
@@ -77,29 +78,69 @@ export function LeadsTable({ leads }: LeadsTableProps) {
         }
     };
 
+    const handleBulkStatusChange = async (newStatus: string) => {
+        if (filteredLeads.length === 0) return;
+
+        if (!confirm(`Tem certeza que deseja marcar ${filteredLeads.length} leads como ${newStatus}?`)) {
+            return;
+        }
+
+        setIsUpdatingBulk(true);
+        try {
+            const ids = filteredLeads.map(lead => lead.id);
+            const result = await updateMultipleLeadsStatus(ids, newStatus);
+            if (result && result.error) {
+                alert(result.error);
+            }
+        } catch (error) {
+            console.error('Failed to update multiple status', error);
+            alert('Erro ao atualizar status em massa');
+        } finally {
+            setIsUpdatingBulk(false);
+        }
+    };
+
     return (
         <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row justify-end gap-4">
-                <div className="w-full sm:w-64">
-                    <label htmlFor="name-filter" className="block text-sm font-medium text-gray-700 mb-1">Buscar por nome</label>
-                    <input
-                        type="text"
-                        id="name-filter"
-                        value={nameFilter}
-                        onChange={(e) => setNameFilter(e.target.value)}
-                        placeholder="Nome do lead..."
-                        className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm outline-none"
-                    />
+            <div className="flex flex-col sm:flex-row justify-between items-end gap-4">
+                <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                    <button
+                        onClick={() => handleBulkStatusChange('ativo')}
+                        disabled={isUpdatingBulk || filteredLeads.length === 0}
+                        className="px-4 py-2 bg-green-600 outline-none hover:bg-green-700 text-white text-sm font-medium rounded-xl transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex-1 sm:flex-none whitespace-nowrap"
+                    >
+                        {isUpdatingBulk ? 'Salvando...' : 'Ativar Todos'}
+                    </button>
+                    <button
+                        onClick={() => handleBulkStatusChange('inativo')}
+                        disabled={isUpdatingBulk || filteredLeads.length === 0}
+                        className="px-4 py-2 bg-gray-600 outline-none hover:bg-gray-700 text-white text-sm font-medium rounded-xl transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex-1 sm:flex-none whitespace-nowrap"
+                    >
+                        {isUpdatingBulk ? 'Salvando...' : 'Desativar Todos'}
+                    </button>
                 </div>
-                <div className="w-full sm:w-64">
-                    <label htmlFor="date-filter" className="block text-sm font-medium text-gray-700 mb-1">Filtrar por data de cadastro</label>
-                    <input
-                        type="date"
-                        id="date-filter"
-                        value={dateFilter}
-                        onChange={(e) => setDateFilter(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm outline-none"
-                    />
+                <div className="flex flex-col sm:flex-row justify-end gap-4 w-full sm:w-auto">
+                    <div className="w-full sm:w-64">
+                        <label htmlFor="name-filter" className="block text-sm font-medium text-gray-700 mb-1">Buscar por nome</label>
+                        <input
+                            type="text"
+                            id="name-filter"
+                            value={nameFilter}
+                            onChange={(e) => setNameFilter(e.target.value)}
+                            placeholder="Nome do lead..."
+                            className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm outline-none"
+                        />
+                    </div>
+                    <div className="w-full sm:w-64">
+                        <label htmlFor="date-filter" className="block text-sm font-medium text-gray-700 mb-1">Filtrar por data de cadastro</label>
+                        <input
+                            type="date"
+                            id="date-filter"
+                            value={dateFilter}
+                            onChange={(e) => setDateFilter(e.target.value)}
+                            className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm outline-none"
+                        />
+                    </div>
                 </div>
             </div>
 

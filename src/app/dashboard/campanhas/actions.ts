@@ -1,7 +1,19 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
+import { after } from 'next/server';
+
+// Cliente Supabase para uso em background (after()), sem depender de cookies.
+// O after() roda DEPOIS que a resposta HTTP já foi enviada, então os cookies
+// do request não existem mais. Por isso usamos a anon key direto.
+function createBackgroundClient() {
+    return createSupabaseClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+}
 
 const META_API_URL = 'https://graph.facebook.com/v21.0';
 
@@ -22,12 +34,18 @@ export async function createCampaign(formData: FormData) {
     const table = publico_alvo === 'leads' ? 'clientes' : 'vendedores';
     const { count } = await supabase.from(table).select('*', { count: 'exact', head: true }).eq('status', 'ativo');
 
+    if (!count || count === 0) {
+        return { error: `Não há ${publico_alvo} com status 'ativo' para disparar esta campanha.` };
+    }
+
     const { data: campaign, error } = await supabase.from('campanhas').insert({
         nome,
         mensagem,
         imagem_url: imagem_url || null,
         publico_alvo,
         total_alvos: count || 0,
+        enviados: 0,
+        erros: 0,
         status: 'rascunho'
     }).select().single();
 
@@ -42,8 +60,6 @@ export async function createCampaign(formData: FormData) {
 
 // ─── Internal Dispatch ──────────────────────────
 export async function dispatchCampaign(formData: FormData) {
-    const supabase = await createClient();
-
     const templateName = formData.get('template_name') as string;
     const audience = formData.get('audience') as string;
 
@@ -66,14 +82,17 @@ export async function dispatchCampaign(formData: FormData) {
     const createResult = await createCampaign(campaignFormData);
     if (createResult.error) return { error: createResult.error, success: false };
 
-    // Disparar envio e aguardar conclusão
+    // Disparar envio em background usando after() para não bloquear a resposta
+    // Isso evita timeout na Vercel quando há muitos leads com delay de 15s cada
     if (createResult.campaign) {
-        try {
-            await sendCampaign(createResult.campaign.id);
-        } catch (err) {
-            console.error('Erro durante envio da campanha:', err);
-            // A campanha já foi criada, sendCampaign já atualiza status internamente
-        }
+        const campaignId = createResult.campaign.id;
+        after(async () => {
+            try {
+                await sendCampaign(campaignId);
+            } catch (err) {
+                console.error('Erro durante envio da campanha:', err);
+            }
+        });
     }
 
     return { success: true, campaignId: createResult.campaign?.id, error: null };
@@ -301,8 +320,10 @@ export async function listTemplatesMeta() {
 }
 
 // ─── Send Campaign Messages ──────────────────────
+// IMPORTANTE: Esta função roda dentro de after(), ou seja, em background
+// depois que a resposta HTTP já foi enviada. Por isso usa createBackgroundClient().
 export async function sendCampaign(campaignId: string) {
-    const supabase = await createClient();
+    const supabase = createBackgroundClient();
     const token = process.env.META_WHATSAPP_TOKEN;
     const phoneId = process.env.META_WHATSAPP_PHONE_ID;
 
