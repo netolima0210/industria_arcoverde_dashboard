@@ -7,11 +7,12 @@ import { after } from 'next/server';
 
 // Cliente Supabase para uso em background (after()), sem depender de cookies.
 // O after() roda DEPOIS que a resposta HTTP já foi enviada, então os cookies
-// do request não existem mais. Por isso usamos a anon key direto.
+// do request não existem mais. Usamos a SERVICE_ROLE_KEY que bypassa o RLS,
+// pois o anon key seria bloqueado pelas políticas de acesso autenticado.
 function createBackgroundClient() {
     return createSupabaseClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 }
 
@@ -54,7 +55,9 @@ export async function createCampaign(formData: FormData) {
         return { error: 'Erro ao criar campanha.' };
     }
 
-    revalidatePath('/dashboard/campanhas');
+    // Não chamamos revalidatePath aqui pois a page é 'use client' e faz fetchCampanhas()
+    // manualmente após o disparo. Chamar revalidatePath durante uma server action que
+    // atualiza o state do cliente causa React error #418 (hydration mismatch).
     return { success: true, campaign, error: null };
 }
 
