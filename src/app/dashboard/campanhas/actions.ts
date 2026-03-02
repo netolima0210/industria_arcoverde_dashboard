@@ -322,6 +322,29 @@ export async function listTemplatesMeta() {
     }
 }
 
+// ─── Fetch Template Components from Meta ─────────
+// Busca os componentes de um template aprovado para construir o payload de envio correto.
+async function fetchTemplateComponents(templateName: string) {
+    const token = process.env.META_WHATSAPP_TOKEN;
+    const wabaId = process.env.META_WABA_ID;
+    if (!token || !wabaId) return null;
+    try {
+        const response = await fetch(
+            `${META_API_URL}/${wabaId}/message_templates?name=${encodeURIComponent(templateName)}&fields=components`,
+            { headers: { 'Authorization': `Bearer ${token}` } }
+        );
+        const data = await response.json();
+        if (!response.ok || !data.data?.length) {
+            console.error('[fetchTemplateComponents] Error:', JSON.stringify(data));
+            return null;
+        }
+        return data.data[0].components as Array<{ type: string; format?: string; text?: string; buttons?: any[] }>;
+    } catch (err) {
+        console.error('[fetchTemplateComponents] Exception:', err);
+        return null;
+    }
+}
+
 // ─── Send Campaign Messages ──────────────────────
 // IMPORTANTE: Esta função roda dentro de after(), ou seja, em background
 // depois que a resposta HTTP já foi enviada. Por isso usa createBackgroundClient().
@@ -350,15 +373,19 @@ export async function sendCampaign(campaignId: string) {
     const isLeads = campaign.publico_alvo === 'leads';
     const idField = isLeads ? 'lead_id' : 'vendedor_id';
 
-    let targets: { id: string; phone: string | null }[] = [];
+    let targets: { id: string; phone: string | null; name: string | null }[] = [];
 
     if (isLeads) {
-        const { data } = await supabase.from('clientes').select('id, contato').eq('status', 'ativo');
-        targets = (data || []).map((t) => ({ id: t.id, phone: t.contato }));
+        const { data } = await supabase.from('clientes').select('id, contato, nome').eq('status', 'ativo');
+        targets = (data || []).map((t) => ({ id: t.id, phone: t.contato, name: t.nome }));
     } else {
-        const { data } = await supabase.from('vendedores').select('id, telefone').eq('status', 'ativo');
-        targets = (data || []).map((t) => ({ id: t.id, phone: t.telefone }));
+        const { data } = await supabase.from('vendedores').select('id, telefone, nome').eq('status', 'ativo');
+        targets = (data || []).map((t) => ({ id: t.id, phone: t.telefone, name: t.nome }));
     }
+
+    // Buscar componentes do template uma única vez para construir o payload correto.
+    // Erro #132012 ocorre quando os componentes enviados não batem com os do template aprovado.
+    const templateComponents = await fetchTemplateComponents(campaign.mensagem);
 
     if (targets.length === 0) {
         await supabase.from('campanhas').update({ status: 'concluida' }).eq('id', campaignId);
@@ -392,39 +419,56 @@ export async function sendCampaign(campaignId: string) {
         const fullPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
 
         try {
-            const messagePayload: Record<string, any> = {
+            // Construir os componentes de envio com base nos componentes do template aprovado.
+            // Só componentes com parâmetros variáveis precisam ser enviados.
+            const sendComponents: any[] = [];
+            if (templateComponents) {
+                for (const comp of templateComponents) {
+                    if (comp.type === 'HEADER') {
+                        if (comp.format === 'IMAGE') {
+                            const imageUrl = campaign.imagem_url;
+                            if (imageUrl) {
+                                sendComponents.push({
+                                    type: 'header',
+                                    parameters: [{ type: 'image', image: { link: imageUrl } }]
+                                });
+                            }
+                        } else if (comp.format === 'DOCUMENT') {
+                            const docUrl = campaign.imagem_url;
+                            if (docUrl) {
+                                sendComponents.push({
+                                    type: 'header',
+                                    parameters: [{ type: 'document', document: { link: docUrl, filename: 'documento.pdf' } }]
+                                });
+                            }
+                        }
+                        // HEADER TEXT estático não precisa de parâmetros
+                    } else if (comp.type === 'BODY') {
+                        // Detectar variáveis {{1}}, {{2}}, etc. no texto do body
+                        const vars = (comp.text || '').match(/\{\{\d+\}\}/g);
+                        if (vars && vars.length > 0) {
+                            const params = vars.map((_, i) => ({
+                                type: 'text',
+                                text: i === 0 ? (target.name || 'Cliente') : ''
+                            }));
+                            sendComponents.push({ type: 'body', parameters: params });
+                        }
+                        // BODY estático (sem variáveis) não precisa de parâmetros
+                    }
+                    // FOOTER e BUTTONS estáticos não precisam de parâmetros
+                }
+            }
+
+            const messagePayload = {
                 messaging_product: 'whatsapp',
                 to: fullPhone,
                 type: 'template',
                 template: {
-                    name: campaign.mensagem, // We are storing the template name in the 'mensagem' field
-                    language: {
-                        code: 'pt_BR'
-                    },
-                    components: []
+                    name: campaign.mensagem, // template name está armazenado no campo mensagem
+                    language: { code: 'pt_BR' },
+                    components: sendComponents
                 }
             };
-
-            // If a media URL is provided, attach it as a header component
-            if (campaign.imagem_url) {
-                const isPdf = campaign.imagem_url.toLowerCase().endsWith('.pdf');
-                const mediaType = isPdf ? 'document' : 'image';
-                const mediaObject: any = { link: campaign.imagem_url };
-
-                if (isPdf) {
-                    mediaObject.filename = 'documento.pdf';
-                }
-
-                messagePayload.template.components.push({
-                    type: 'header',
-                    parameters: [
-                        {
-                            type: mediaType,
-                            [mediaType]: mediaObject
-                        }
-                    ]
-                });
-            }
 
             const response = await fetch(`${META_API_URL}/${phoneId}/messages`, {
                 method: 'POST',
