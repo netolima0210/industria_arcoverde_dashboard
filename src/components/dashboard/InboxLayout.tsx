@@ -8,6 +8,7 @@ interface Cliente {
     id: number;
     nome: string;
     contato: string;
+    last_message_at?: string;
 }
 
 interface Mensagem {
@@ -60,6 +61,18 @@ export function InboxLayout({ clientes }: { clientes: Cliente[] }) {
         return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
     }
 
+    function formatLastSeen(dateString?: string) {
+        if (!dateString) return '';
+        const d = new Date(dateString);
+        const now = new Date();
+        const diffMs = now.getTime() - d.getTime();
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        if (diffDays === 0) return formatTime(dateString);
+        if (diffDays === 1) return 'Ontem';
+        if (diffDays < 7) return d.toLocaleDateString('pt-BR', { weekday: 'short' });
+        return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    }
+
     return (
         <div className="flex h-[calc(100vh-140px)] bg-white rounded-2xl shadow-sm border border-gray-200/60 overflow-hidden">
             {/* Lado Esquerdo - Contatos */}
@@ -93,9 +106,16 @@ export function InboxLayout({ clientes }: { clientes: Cliente[] }) {
                                 <User className="h-5 w-5" />
                             </div>
                             <div className="flex-1 min-w-0">
-                                <p className="text-sm font-semibold text-gray-900 truncate">
-                                    {c.nome || 'Sem Nome'}
-                                </p>
+                                <div className="flex items-center justify-between">
+                                    <p className="text-sm font-semibold text-gray-900 truncate">
+                                        {c.nome || 'Sem Nome'}
+                                    </p>
+                                    {c.last_message_at && (
+                                        <span className="text-[10px] text-gray-400 flex-shrink-0 ml-2">
+                                            {formatLastSeen(c.last_message_at)}
+                                        </span>
+                                    )}
+                                </div>
                                 <p className="text-xs text-gray-400 truncate mt-0.5">
                                     {c.contato}
                                 </p>
@@ -167,8 +187,8 @@ export function InboxLayout({ clientes }: { clientes: Cliente[] }) {
                                                     </div>
 
                                                     <div className={`relative px-4 py-2.5 rounded-2xl shadow-sm flex flex-col ${isAI
-                                                            ? 'bg-white border text-gray-700 border-gray-100 rounded-tl-none'
-                                                            : 'bg-[#daf8cb] border border-[#cfecd0] text-gray-800 rounded-tr-none'
+                                                        ? 'bg-white border text-gray-700 border-gray-100 rounded-tl-none'
+                                                        : 'bg-[#daf8cb] border border-[#cfecd0] text-gray-800 rounded-tr-none'
                                                         }`}>
                                                         <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
                                                             {msg.content}
