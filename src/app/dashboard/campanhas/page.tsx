@@ -1,12 +1,11 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { listTemplatesMeta, submitTemplateMeta, dispatchCampaign } from './actions';
-import Link from 'next/link';
+import { listTemplatesMeta, submitTemplateMeta, dispatchCampaign, listCampanhas, getCampanhaEnvios } from './actions';
 import {
     Loader2, CheckCircle2, AlertCircle, RefreshCw,
     FileText, Image as ImageIcon, FileOutput, Send, Clock, XCircle, UploadCloud,
-    Users, Contact, Rocket, ChevronRight, X
+    Users, Contact, Rocket, ChevronRight, ChevronDown, X, Megaphone, History
 } from 'lucide-react';
 
 type Template = {
@@ -14,6 +13,26 @@ type Template = {
     status: string;
     category: string;
     language: string;
+};
+
+type Campanha = {
+    id: string;
+    nome: string;
+    mensagem: string;
+    publico_alvo: string;
+    status: string;
+    total_alvos: number;
+    enviados: number;
+    erros: number;
+    created_at: string;
+};
+
+type Envio = {
+    id: string;
+    status: string;
+    mensagem_erro: string | null;
+    enviado_at: string | null;
+    destinatario_nome: string;
 };
 
 const STATUS_CONFIG: Record<string, { label: string; icon: React.ReactNode; classes: string }> = {
@@ -34,8 +53,18 @@ const STATUS_CONFIG: Record<string, { label: string; icon: React.ReactNode; clas
     },
 };
 
+const CAMPANHA_STATUS: Record<string, { label: string; classes: string; icon: React.ReactNode }> = {
+    rascunho: { label: 'Rascunho', classes: 'bg-gray-100 text-gray-600', icon: <Clock className="h-3 w-3" /> },
+    processando: { label: 'Enviando...', classes: 'bg-blue-100 text-blue-700', icon: <Loader2 className="h-3 w-3 animate-spin" /> },
+    concluida: { label: 'Concluída', classes: 'bg-green-100 text-green-700', icon: <CheckCircle2 className="h-3 w-3" /> },
+};
+
 function getStatus(status: string) {
     return STATUS_CONFIG[status.toUpperCase()] ?? STATUS_CONFIG.PENDING;
+}
+
+function getCampanhaStatus(status: string) {
+    return CAMPANHA_STATUS[status] ?? CAMPANHA_STATUS.rascunho;
 }
 
 export default function CampanhasPage() {
@@ -52,14 +81,18 @@ export default function CampanhasPage() {
     const [submitStatus, setSubmitStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
     const [submitMessage, setSubmitMessage] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const dispatchMediaRef = useRef<HTMLInputElement>(null);
 
-    // Dispatching state
+    // Dispatching state (simplified)
     const [dispatchingTemplate, setDispatchingTemplate] = useState<Template | null>(null);
     const [audienceChoices, setAudienceChoices] = useState<Record<string, 'leads' | 'vendedores'>>({});
-    const [campanhaName, setCampanhaName] = useState('');
-    const [dispatchMedia, setDispatchMedia] = useState<File | null>(null);
     const [isSendingCampaign, setIsSendingCampaign] = useState(false);
+
+    // Campanhas enviadas
+    const [campanhas, setCampanhas] = useState<Campanha[]>([]);
+    const [loadingCampanhas, setLoadingCampanhas] = useState(true);
+    const [expandedCampanha, setExpandedCampanha] = useState<string | null>(null);
+    const [enviosMap, setEnviosMap] = useState<Record<string, Envio[]>>({});
+    const [loadingEnvios, setLoadingEnvios] = useState<string | null>(null);
 
     const fetchTemplates = async () => {
         setRefreshing(true);
@@ -69,7 +102,17 @@ export default function CampanhasPage() {
         setRefreshing(false);
     };
 
-    useEffect(() => { fetchTemplates(); }, []);
+    const fetchCampanhas = async () => {
+        setLoadingCampanhas(true);
+        const result = await listCampanhas();
+        if (result.campanhas) setCampanhas(result.campanhas);
+        setLoadingCampanhas(false);
+    };
+
+    useEffect(() => {
+        fetchTemplates();
+        fetchCampanhas();
+    }, []);
 
     const handleHeaderTypeChange = (type: 'NONE' | 'IMAGE' | 'DOCUMENT') => {
         setHeaderType(type);
@@ -126,41 +169,54 @@ export default function CampanhasPage() {
 
     const toggleAudience = (templateName: string, audience: 'leads' | 'vendedores') => {
         setAudienceChoices(prev => {
-            const current = prev[templateName] === audience ? undefined : audience;
             return { ...prev, [templateName]: audience };
         });
     };
 
     const handleOpenDispatch = (tpl: Template) => {
         setDispatchingTemplate(tpl);
-        setCampanhaName(`campanha_${tpl.name}_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '_')}`);
-        setDispatchMedia(null);
     };
 
     const handleConfirmDispatch = async () => {
-        if (!dispatchingTemplate || !campanhaName.trim()) return;
+        if (!dispatchingTemplate) return;
         const audience = audienceChoices[dispatchingTemplate.name] || 'leads';
 
         setIsSendingCampaign(true);
 
         const formData = new FormData();
         formData.set('template_name', dispatchingTemplate.name);
-        formData.set('campanha_name', campanhaName);
         formData.set('audience', audience);
-        if (dispatchMedia) formData.set('media_file', dispatchMedia);
 
         const result = await dispatchCampaign(formData);
 
         setIsSendingCampaign(false);
+        setDispatchingTemplate(null);
 
         if (result.error) {
             alert(`Erro: ${result.error}`);
         } else {
-            alert(`Campanha "${campanhaName}" criada e disparando para ${audience.toUpperCase()}!`);
-            setDispatchingTemplate(null);
-            setCampanhaName('');
-            setDispatchMedia(null);
+            alert(`Campanha disparada com sucesso para ${audience.toUpperCase()}!`);
+            fetchCampanhas();
         }
+    };
+
+    const handleToggleEnvios = async (campanhaId: string) => {
+        if (expandedCampanha === campanhaId) {
+            setExpandedCampanha(null);
+            return;
+        }
+
+        setExpandedCampanha(campanhaId);
+
+        // Se já carregou, não busca de novo
+        if (enviosMap[campanhaId]) return;
+
+        setLoadingEnvios(campanhaId);
+        const result = await getCampanhaEnvios(campanhaId);
+        if (result.envios) {
+            setEnviosMap(prev => ({ ...prev, [campanhaId]: result.envios }));
+        }
+        setLoadingEnvios(null);
     };
 
     return (
@@ -334,7 +390,6 @@ export default function CampanhasPage() {
                         <div className="bg-[#E5DDD5] rounded-xl p-4 min-h-[260px] flex flex-col gap-1 shadow-inner">
                             <div className="bg-white rounded-lg shadow-sm max-w-[92%] space-y-2 relative pb-6 border border-gray-100 overflow-hidden">
 
-
                                 {/* Header preview */}
                                 {headerType === 'IMAGE' && (
                                     headerPreviewUrl ? (
@@ -491,15 +546,143 @@ export default function CampanhasPage() {
                 </div>
             </div>
 
-            {/* Dispatch Modal Overlay */}
+            {/* ── CAMPANHAS ENVIADAS ──────────────────────────── */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200/60 overflow-hidden">
+                <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                    <div className="flex items-center gap-3">
+                        <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
+                            <History className="h-4 w-4" />
+                        </div>
+                        <div>
+                            <h2 className="font-bold text-sm text-gray-800">Campanhas Enviadas</h2>
+                            <p className="text-xs text-gray-500 mt-0.5">Histórico de disparos e status de cada envio.</p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={fetchCampanhas}
+                        disabled={loadingCampanhas}
+                        title="Atualizar"
+                        className="p-2 border border-gray-200 bg-white shadow-sm rounded-lg text-gray-500 hover:text-primary hover:border-primary/40 transition-all disabled:opacity-50"
+                    >
+                        <RefreshCw className={`h-4 w-4 ${loadingCampanhas ? 'animate-spin text-primary' : ''}`} />
+                    </button>
+                </div>
+
+                {loadingCampanhas ? (
+                    <div className="p-8 flex justify-center">
+                        <Loader2 className="h-7 w-7 animate-spin text-primary/40" />
+                    </div>
+                ) : campanhas.length === 0 ? (
+                    <div className="p-8 text-center text-gray-500">
+                        <Megaphone className="h-9 w-9 mx-auto text-gray-200 mb-2" />
+                        <p className="text-sm font-medium">Nenhuma campanha enviada ainda.</p>
+                        <p className="text-xs text-gray-400 mt-1">Dispare sua primeira campanha usando um template aprovado acima.</p>
+                    </div>
+                ) : (
+                    <ul className="divide-y divide-gray-100">
+                        {campanhas.map((camp) => {
+                            const st = getCampanhaStatus(camp.status);
+                            const isExpanded = expandedCampanha === camp.id;
+                            const envios = enviosMap[camp.id];
+
+                            return (
+                                <li key={camp.id}>
+                                    <button
+                                        onClick={() => handleToggleEnvios(camp.id)}
+                                        className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50/80 transition-colors text-left"
+                                    >
+                                        <div className="flex items-center gap-4 flex-1 min-w-0">
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-bold text-gray-800 truncate">{camp.nome}</p>
+                                                <div className="flex items-center gap-3 mt-1">
+                                                    <span className="text-[10px] text-gray-400 uppercase font-medium">
+                                                        {camp.publico_alvo === 'leads' ? '👥 Leads' : '🤝 Vendedores'}
+                                                    </span>
+                                                    {camp.status === 'concluida' && (
+                                                        <span className="text-[10px] text-gray-400">
+                                                            ✅ {camp.enviados} enviados · {camp.erros > 0 ? `❌ ${camp.erros} erros` : 'sem erros'}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-3">
+                                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold ${st.classes}`}>
+                                                {st.icon}
+                                                {st.label}
+                                            </span>
+                                            {isExpanded
+                                                ? <ChevronDown className="h-4 w-4 text-gray-400" />
+                                                : <ChevronRight className="h-4 w-4 text-gray-400" />
+                                            }
+                                        </div>
+                                    </button>
+
+                                    {/* Detalhe expandido */}
+                                    {isExpanded && (
+                                        <div className="px-5 pb-4 bg-gray-50/50 border-t border-gray-100">
+                                            {loadingEnvios === camp.id ? (
+                                                <div className="py-4 flex justify-center">
+                                                    <Loader2 className="h-5 w-5 animate-spin text-primary/40" />
+                                                </div>
+                                            ) : !envios || envios.length === 0 ? (
+                                                <p className="text-xs text-gray-400 py-3">Nenhum envio registrado para esta campanha.</p>
+                                            ) : (
+                                                <div className="mt-3 space-y-1.5">
+                                                    <div className="grid grid-cols-3 gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider px-3 pb-1">
+                                                        <span>Destinatário</span>
+                                                        <span>Status</span>
+                                                        <span>Detalhe</span>
+                                                    </div>
+                                                    {envios.map((envio, idx) => (
+                                                        <div key={envio.id || idx} className="grid grid-cols-3 gap-2 items-center px-3 py-2 bg-white rounded-lg border border-gray-100 text-xs">
+                                                            <span className="font-medium text-gray-700 truncate">{envio.destinatario_nome}</span>
+                                                            <span>
+                                                                {envio.status === 'enviado' ? (
+                                                                    <span className="inline-flex items-center gap-1 text-green-600 font-bold">
+                                                                        <CheckCircle2 className="h-3 w-3" /> Enviado
+                                                                    </span>
+                                                                ) : envio.status === 'erro' ? (
+                                                                    <span className="inline-flex items-center gap-1 text-red-500 font-bold">
+                                                                        <XCircle className="h-3 w-3" /> Erro
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="inline-flex items-center gap-1 text-amber-500 font-bold">
+                                                                        <Clock className="h-3 w-3" /> Pendente
+                                                                    </span>
+                                                                )}
+                                                            </span>
+                                                            <span className="text-gray-400 truncate">
+                                                                {envio.status === 'erro' && envio.mensagem_erro
+                                                                    ? envio.mensagem_erro
+                                                                    : envio.status === 'enviado' && envio.enviado_at
+                                                                        ? new Date(envio.enviado_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+                                                                        : '—'
+                                                                }
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </li>
+                            );
+                        })}
+                    </ul>
+                )}
+            </div>
+
+            {/* ── DISPATCH CONFIRMATION MODAL (Simplified) ──── */}
             {dispatchingTemplate && (
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+                    <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
                         {/* Modal Header */}
                         <div className="bg-gray-50/80 px-6 py-4 flex items-center justify-between border-b border-gray-100">
                             <div className="flex items-center gap-2">
                                 <Rocket className="h-5 w-5 text-primary" />
-                                <h3 className="font-bold text-gray-800">Finalizar Disparo</h3>
+                                <h3 className="font-bold text-gray-800">Confirmar Disparo</h3>
                             </div>
                             <button
                                 onClick={() => setDispatchingTemplate(null)}
@@ -510,57 +693,26 @@ export default function CampanhasPage() {
                         </div>
 
                         {/* Modal Content */}
-                        <div className="p-6 space-y-6">
-                            <div>
-                                <p className="text-xs text-gray-500 mb-4">
-                                    Enviando template <span className="font-bold text-primary">"{dispatchingTemplate.name}"</span> para
-                                    <span className="font-bold text-gray-800 uppercase"> {audienceChoices[dispatchingTemplate.name] || 'leads'}</span>.
+                        <div className="p-6 space-y-4">
+                            <p className="text-sm text-gray-600 leading-relaxed">
+                                Deseja enviar o template{' '}
+                                <span className="font-bold text-primary">"{dispatchingTemplate.name}"</span>{' '}
+                                para todos os{' '}
+                                <span className="font-bold text-gray-800 uppercase">
+                                    {audienceChoices[dispatchingTemplate.name] || 'leads'}
+                                </span>{' '}
+                                ativos?
+                            </p>
+
+                            <div className="bg-amber-50 rounded-xl p-3 border border-amber-200">
+                                <p className="text-xs text-amber-700">
+                                    ⚠️ As mensagens serão enviadas com intervalo de 15 segundos entre cada uma para manter a qualidade do número.
                                 </p>
-
-                                <label className="block text-sm font-bold text-gray-700 mb-2">
-                                    Nome Interno da Campanha
-                                </label>
-                                <input
-                                    type="text"
-                                    className="block w-full rounded-xl border-gray-200 bg-gray-50 shadow-sm focus:border-primary focus:ring-primary focus:bg-white transition-all text-sm p-3 border"
-                                    placeholder="ex: Campanha Especial Lançamento"
-                                    value={campanhaName}
-                                    onChange={e => setCampanhaName(e.target.value)}
-                                />
-                            </div>
-
-                            {/* Optional Media (Simulated logic based on header type) */}
-                            <div className="bg-primary/5 rounded-2xl p-4 border border-primary/10">
-                                <label className="block text-[11px] font-bold text-primary uppercase mb-2">
-                                    Mídia do Cabeçalho
-                                </label>
-                                <div
-                                    onClick={() => dispatchMediaRef.current?.click()}
-                                    className="cursor-pointer border-2 border-dashed border-primary/20 bg-white hover:border-primary/40 rounded-xl p-4 flex flex-col items-center gap-2 transition-all"
-                                >
-                                    <input
-                                        type="file"
-                                        className="hidden"
-                                        ref={dispatchMediaRef}
-                                        onChange={(e) => setDispatchMedia(e.target.files?.[0] || null)}
-                                    />
-                                    {dispatchMedia ? (
-                                        <div className="flex items-center gap-2">
-                                            <CheckCircle2 className="h-4 w-4 text-green-500" />
-                                            <span className="text-xs font-medium text-gray-700">{dispatchMedia.name}</span>
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <UploadCloud className="h-5 w-5 text-gray-400" />
-                                            <span className="text-xs text-gray-500 font-medium text-center line-clamp-1">Carregar imagem ou PDF</span>
-                                        </>
-                                    )}
-                                </div>
                             </div>
                         </div>
 
                         {/* Modal Footer */}
-                        <div className="p-6 pt-0 flex gap-3">
+                        <div className="px-6 pb-6 flex gap-3">
                             <button
                                 onClick={() => setDispatchingTemplate(null)}
                                 className="flex-1 py-3 px-4 rounded-xl font-bold text-sm text-gray-500 hover:bg-gray-100 transition-colors"
@@ -569,11 +721,11 @@ export default function CampanhasPage() {
                             </button>
                             <button
                                 onClick={handleConfirmDispatch}
-                                disabled={!campanhaName || isSendingCampaign}
+                                disabled={isSendingCampaign}
                                 className="flex-[2] bg-primary text-white py-3 px-4 rounded-xl font-bold text-sm shadow-md hover:bg-primary/90 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                             >
                                 {isSendingCampaign ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                                Confirmar Envio
+                                {isSendingCampaign ? 'Enviando...' : 'Confirmar Envio'}
                             </button>
                         </div>
                     </div>

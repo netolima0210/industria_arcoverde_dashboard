@@ -45,72 +45,35 @@ export async function dispatchCampaign(formData: FormData) {
     const supabase = await createClient();
 
     const templateName = formData.get('template_name') as string;
-    const campanhaName = formData.get('campanha_name') as string;
     const audience = formData.get('audience') as string;
-    const mediaFile = formData.get('media_file') as File | null;
 
-    if (!templateName || !campanhaName || !audience) {
+    if (!templateName || !audience) {
         return { error: 'Dados incompletos para o disparo.', success: false };
     }
 
-    let imagem_url = null;
-
-    // Handle Media Upload to Supabase Storage
-    if (mediaFile && mediaFile.size > 0) {
-        const fileExt = mediaFile.name.split('.').pop();
-        const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-        const filePath = `campanhas/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-            .from('campanhas')
-            .upload(filePath, mediaFile);
-
-        if (uploadError) {
-            console.error('Upload error:', uploadError);
-            return { error: 'Erro ao fazer upload da mídia.', success: false };
-        }
-
-        // Get public URL
-        const { data: { publicUrl } } = supabase.storage
-            .from('campanhas')
-            .getPublicUrl(filePath);
-
-        // Force original supabase URL to avoid Meta rejecting custom domains
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-        if (supabaseUrl && publicUrl.startsWith(supabaseUrl)) {
-            imagem_url = publicUrl;
-        } else if (supabaseUrl) {
-            const urlObj = new URL(publicUrl);
-            const originalUrlObj = new URL(supabaseUrl);
-            urlObj.hostname = originalUrlObj.hostname;
-            imagem_url = urlObj.toString();
-        } else {
-            imagem_url = publicUrl;
-        }
-    }
+    // Gerar nome automático: template + data/hora
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const timeStr = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const campanhaName = `${templateName} — ${dateStr} ${timeStr}`;
 
     // Create the campaign record
     const campaignFormData = new FormData();
     campaignFormData.set('nome', campanhaName);
     campaignFormData.set('mensagem', templateName); // Store template name in mensagem field
     campaignFormData.set('publico_alvo', audience);
-    if (imagem_url) campaignFormData.set('imagem_url', imagem_url);
 
     const createResult = await createCampaign(campaignFormData);
     if (createResult.error) return { error: createResult.error, success: false };
 
-    // Trigger the send process (this will run in background since we don't await the full loop if possible, 
-    // but here we are in a server action. For simplicity, we trigger it).
-    // Note: sendCampaign has a 15s delay per message, so it will take a while for large lists.
-    // In a real app, this should be offloaded to a background worker / edge function.
-
-    // We trigger sendCampaign but we don't await it to avoid blocking the user 
-    // Wait, in Next.js Server Actions, if we don't await, it might be killed.
-    // However, we'll return success so the user sees the campaign as "processing".
-
-    // Trigger sending process
+    // Disparar envio e aguardar conclusão
     if (createResult.campaign) {
-        sendCampaign(createResult.campaign.id);
+        try {
+            await sendCampaign(createResult.campaign.id);
+        } catch (err) {
+            console.error('Erro durante envio da campanha:', err);
+            // A campanha já foi criada, sendCampaign já atualiza status internamente
+        }
     }
 
     return { success: true, campaignId: createResult.campaign?.id, error: null };
@@ -484,4 +447,76 @@ export async function sendCampaign(campaignId: string) {
 
     revalidatePath('/dashboard/campanhas');
     return { success: true, enviados, erros };
+}
+
+// ─── List Campanhas ──────────────────────────────
+export async function listCampanhas() {
+    const supabase = await createClient();
+
+    const { data: campanhas, error } = await supabase
+        .from('campanhas')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+    if (error) {
+        console.error('Error listing campanhas:', error);
+        return { campanhas: [], error: 'Erro ao buscar campanhas.' };
+    }
+
+    return { campanhas: campanhas || [] };
+}
+
+// ─── Get Campanha Envios (detalhes por destinatário) ──
+export async function getCampanhaEnvios(campanhaId: string) {
+    const supabase = await createClient();
+
+    // Buscar a campanha para saber o público alvo
+    const { data: campanha } = await supabase
+        .from('campanhas')
+        .select('publico_alvo')
+        .eq('id', campanhaId)
+        .single();
+
+    if (!campanha) return { envios: [], error: 'Campanha não encontrada.' };
+
+    // Buscar envios
+    const { data: envios, error } = await supabase
+        .from('campanhas_envios')
+        .select('*')
+        .eq('campanha_id', campanhaId)
+        .order('created_at', { ascending: true });
+
+    if (error) {
+        console.error('Error fetching envios:', error);
+        return { envios: [], error: 'Erro ao buscar envios.' };
+    }
+
+    // Enriquecer com nome dos destinatários
+    const isLeads = campanha.publico_alvo === 'leads';
+    const ids = (envios || []).map(e => isLeads ? e.lead_id : e.vendedor_id).filter(Boolean);
+
+    let namesMap: Record<string, string> = {};
+    if (ids.length > 0) {
+        if (isLeads) {
+            const { data: clientes } = await supabase
+                .from('clientes')
+                .select('id, nome, contato')
+                .in('id', ids);
+            (clientes || []).forEach(c => { namesMap[c.id] = c.nome; });
+        } else {
+            const { data: vendedores } = await supabase
+                .from('vendedores')
+                .select('id, nome, telefone')
+                .in('id', ids);
+            (vendedores || []).forEach(v => { namesMap[v.id] = v.nome; });
+        }
+    }
+
+    const enriched = (envios || []).map(e => ({
+        ...e,
+        destinatario_nome: namesMap[isLeads ? e.lead_id : e.vendedor_id] || 'Desconhecido'
+    }));
+
+    return { envios: enriched };
 }
