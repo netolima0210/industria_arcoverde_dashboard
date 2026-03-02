@@ -16,16 +16,28 @@ export async function getLeadMessages(phone: string) {
     const supabase = await createClient();
     const cleanPhone = phone.replace(/\D/g, '');
 
-    // We might match with or without the 9, or just endswith.
-    // The session_id often has 55879..._buffer
-    // We'll query all messages and filter in-memory if the table is reasonable, 
-    // or use ilike if we know the format.
-    // Supabase ilike is better for performance.
+    // Gerar variantes do telefone: com e sem o 9º dígito.
+    // Ex: 5587992052920 (com 9) e 558792052920 (sem 9)
+    // Isso é necessário porque o n8n salva o session_id no formato antigo (sem 9).
+    const variants: string[] = [cleanPhone];
+
+    if (cleanPhone.length === 13 && cleanPhone.startsWith('55')) {
+        // Remover o 9º dígito: 55 + DD + 9XXXXXXXX → 55 + DD + XXXXXXXX
+        const withoutNine = cleanPhone.slice(0, 4) + cleanPhone.slice(5);
+        variants.push(withoutNine);
+    } else if (cleanPhone.length === 12 && cleanPhone.startsWith('55')) {
+        // Adicionar o 9º dígito: 55 + DD + XXXXXXXX → 55 + DD + 9XXXXXXXX
+        const withNine = cleanPhone.slice(0, 4) + '9' + cleanPhone.slice(4);
+        variants.push(withNine);
+    }
+
+    // Busca com OR para cobrir ambas as variantes
+    const orFilter = variants.map(v => `session_id.ilike.%${v}%`).join(',');
 
     const { data, error } = await supabase
         .from('n8n_chat_conversas')
         .select('*')
-        .ilike('session_id', `%${cleanPhone}%`)
+        .or(orFilter)
         .order('created_at', { ascending: true });
 
     if (error) {
