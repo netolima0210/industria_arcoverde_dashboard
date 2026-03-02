@@ -70,11 +70,12 @@ export default async function ConversasPage() {
     });
 
     // 5. Ordenar: quem conversou mais recente fica no topo, sem conversa fica no final
-    clientesWithLastMsg.sort((a, b) => {
-        if (!a.last_message_at && !b.last_message_at) return (a.nome || '').localeCompare(b.nome || '');
-        if (!a.last_message_at) return 1;
-        if (!b.last_message_at) return -1;
-        return b.last_message_at.localeCompare(a.last_message_at);
+    // Filtrar: só quem já conversou aparece (igual WhatsApp)
+    const clientesComConversa = clientesWithLastMsg.filter(c => c.last_message_at);
+
+    // Ordenar: mais recente no topo
+    clientesComConversa.sort((a, b) => {
+        return b.last_message_at!.localeCompare(a.last_message_at!);
     });
 
     return (
@@ -84,7 +85,7 @@ export default async function ConversasPage() {
                 <p className="text-sm text-gray-500">Histórico de conversas completo por lead cadastrado.</p>
             </div>
 
-            <InboxLayout clientes={clientesWithLastMsg} />
+            <InboxLayout clientes={clientesComConversa} />
         </div>
     );
 }
