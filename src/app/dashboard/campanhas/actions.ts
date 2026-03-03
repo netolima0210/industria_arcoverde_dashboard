@@ -173,6 +173,24 @@ export async function deleteCampaign(campaignId: string) {
     return {};
 }
 
+// ─── Get Active Audience Count ────────────────────
+export async function getActiveAudienceCount(audience: 'leads' | 'vendedores'): Promise<number> {
+    const supabase = await createClient();
+    const table = audience === 'leads' ? 'clientes' : 'vendedores';
+
+    const { count, error } = await supabase
+        .from(table)
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'ativo');
+
+    if (error) {
+        console.error(`Erro ao contar ${audience} ativos:`, error);
+        return 0;
+    }
+
+    return count || 0;
+}
+
 // ─── Upload Media to Meta (Resumable Upload API) ──
 async function uploadMediaToMeta(file: File): Promise<{ handle?: string; error?: string }> {
     const token = process.env.META_WHATSAPP_TOKEN;

@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { listTemplatesMeta, submitTemplateMeta, dispatchCampaign, listCampanhas, getCampanhaEnvios, uploadCampaignMedia } from './actions';
+import { listTemplatesMeta, submitTemplateMeta, dispatchCampaign, listCampanhas, getCampanhaEnvios, uploadCampaignMedia, deleteCampaign, getActiveAudienceCount } from './actions';
 import {
     Loader2, CheckCircle2, AlertCircle, RefreshCw,
     FileText, Image as ImageIcon, FileOutput, Send, Clock, XCircle, UploadCloud,
-    Users, Contact, Rocket, ChevronRight, ChevronDown, X, Megaphone, History
+    Users, Contact, Rocket, ChevronRight, ChevronDown, X, Megaphone, History, Trash2
 } from 'lucide-react';
 
 type Template = {
@@ -91,6 +91,25 @@ export default function CampanhasPage() {
     const [dispatchImageUrl, setDispatchImageUrl] = useState('');
     const [dispatchUploading, setDispatchUploading] = useState(false);
     const dispatchFileRef = useRef<HTMLInputElement>(null);
+    const [activeCount, setActiveCount] = useState<number | null>(null);
+
+    // Fetch account when modal opens or audience changes
+    useEffect(() => {
+        if (!dispatchingTemplate) {
+            setActiveCount(null);
+            return;
+        }
+
+        const audience = audienceChoices[dispatchingTemplate.name] || 'leads';
+        let isStale = false;
+
+        setActiveCount(null);
+        getActiveAudienceCount(audience).then(count => {
+            if (!isStale) setActiveCount(count);
+        });
+
+        return () => { isStale = true; };
+    }, [dispatchingTemplate, audienceChoices]);
 
     // Campanhas enviadas
     const [campanhas, setCampanhas] = useState<Campanha[]>([]);
@@ -650,19 +669,18 @@ export default function CampanhasPage() {
                                             {/* Delete Button */}
                                             <button
                                                 type="button"
-                                                title="Excluir histórico dessa campanha"
-                                                onClick={(e) => {
+                                                title="Excluir histórico dessa campanha (apenas interno)"
+                                                onClick={async (e) => {
                                                     e.stopPropagation(); // Evitar expandir a linha
                                                     if (window.confirm(`Tem certeza que deseja excluir o histórico da campanha '${camp.nome}'? Isso não afetará os templates na Meta.`)) {
-                                                        import('./actions').then(m => m.deleteCampaign(camp.id)).then(res => {
-                                                            if (res.error) alert(res.error);
-                                                            else fetchCampanhas();
-                                                        });
+                                                        const res = await deleteCampaign(camp.id);
+                                                        if (res?.error) alert(res.error);
+                                                        else fetchCampanhas();
                                                     }
                                                 }}
                                                 className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
                                             >
-                                                <XCircle className="h-4 w-4" />
+                                                <Trash2 className="h-4 w-4" />
                                             </button>
 
                                             {isExpanded
@@ -812,7 +830,7 @@ export default function CampanhasPage() {
 
                                 <div className="bg-amber-50 rounded-xl p-3 border border-amber-200">
                                     <p className="text-xs text-amber-700">
-                                        ⚠️ As mensagens serão enviadas em lotes paralelos. Para 757 leads, o processo leva cerca de 1-2 minutos.
+                                        ⚠️ As mensagens serão enviadas em lotes. Para {activeCount !== null ? activeCount : '...'} {audienceChoices[dispatchingTemplate.name] || 'leads'}(s) ativos, o processo começará em background e leva cerca de 1 min.
                                     </p>
                                 </div>
                             </div>
