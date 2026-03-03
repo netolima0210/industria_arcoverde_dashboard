@@ -639,181 +639,205 @@ export default function CampanhasPage() {
                                                 </div>
                                             </div>
                                         </div>
+                                    </div>
 
-                                        <div className="flex items-center gap-3">
-                                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold ${st.classes}`}>
-                                                {st.icon}
-                                                {st.label}
-                                            </span>
-                                            {isExpanded
-                                                ? <ChevronDown className="h-4 w-4 text-gray-400" />
-                                                : <ChevronRight className="h-4 w-4 text-gray-400" />
-                                            }
-                                        </div>
-                                    </button>
+                                    <div className="flex items-center gap-4">
+                                        {/* Status Badge */}
+                                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold ${st.classes}`}>
+                                            {st.icon}
+                                            {st.label}
+                                        </span>
 
-                                    {/* Detalhe expandido */}
-                                    {isExpanded && (
-                                        <div className="px-5 pb-4 bg-gray-50/50 border-t border-gray-100">
-                                            {loadingEnvios === camp.id ? (
-                                                <div className="py-4 flex justify-center">
-                                                    <Loader2 className="h-5 w-5 animate-spin text-primary/40" />
-                                                </div>
-                                            ) : !envios || envios.length === 0 ? (
-                                                <p className="text-xs text-gray-400 py-3">Nenhum envio registrado para esta campanha.</p>
-                                            ) : (
-                                                <div className="mt-3 space-y-1.5">
-                                                    <div className="grid grid-cols-3 gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider px-3 pb-1">
-                                                        <span>Destinatário</span>
-                                                        <span>Status</span>
-                                                        <span>Detalhe</span>
-                                                    </div>
-                                                    {envios.map((envio, idx) => (
-                                                        <div key={envio.id || idx} className="grid grid-cols-3 gap-2 items-center px-3 py-2 bg-white rounded-lg border border-gray-100 text-xs">
-                                                            <span className="font-medium text-gray-700 truncate">{envio.destinatario_nome}</span>
-                                                            <span>
-                                                                {envio.status === 'enviado' ? (
-                                                                    <span className="inline-flex items-center gap-1 text-green-600 font-bold">
-                                                                        <CheckCircle2 className="h-3 w-3" /> Enviado
-                                                                    </span>
-                                                                ) : envio.status === 'erro' ? (
-                                                                    <span className="inline-flex items-center gap-1 text-red-500 font-bold">
-                                                                        <XCircle className="h-3 w-3" /> Erro
-                                                                    </span>
-                                                                ) : (
-                                                                    <span className="inline-flex items-center gap-1 text-amber-500 font-bold">
-                                                                        <Clock className="h-3 w-3" /> Pendente
-                                                                    </span>
-                                                                )}
-                                                            </span>
-                                                            <span className="text-gray-400 truncate">
-                                                                {envio.status === 'erro' && envio.mensagem_erro
-                                                                    ? envio.mensagem_erro
-                                                                    : envio.status === 'enviado' && envio.enviado_at
-                                                                        ? new Date(envio.enviado_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
-                                                                        : '—'
-                                                                }
-                                                            </span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </li>
-                            );
-                        })}
-                    </ul>
-                )}
-            </div>
+                                        {/* Delete Button */}
+                                        <button
+                                            type="button"
+                                            title="Excluir histórico dessa campanha"
+                                            onClick={(e) => {
+                                                e.stopPropagation(); // Evitar expandir a linha
+                                                if (window.confirm(`Tem certeza que deseja excluir o histórico da campanha '${camp.nome}'? Isso não afetará os templates na Meta.`)) {
+                                                    import('./actions').then(m => m.deleteCampaign(camp.id)).then(res => {
+                                                        if (res.error) alert(res.error);
+                                                        else fetchCampanhas();
+                                                    });
+                                                }
+                                            }}
+                                            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
+                                        >
+                                            <XCircle className="h-4 w-4" />
+                                        </button>
 
-            {/* ── DISPATCH CONFIRMATION MODAL (Simplified) ──── */}
-            {dispatchingTemplate && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
-                        {/* Modal Header */}
-                        <div className="bg-gray-50/80 px-6 py-4 flex items-center justify-between border-b border-gray-100">
-                            <div className="flex items-center gap-2">
-                                <Rocket className="h-5 w-5 text-primary" />
-                                <h3 className="font-bold text-gray-800">Confirmar Disparo</h3>
-                            </div>
-                            <button
-                                onClick={() => setDispatchingTemplate(null)}
-                                className="p-1.5 hover:bg-gray-200 rounded-lg text-gray-400 transition-colors"
-                            >
-                                <X className="h-5 w-5" />
-                            </button>
-                        </div>
+                                        {isExpanded
+                                            ? <ChevronDown className="h-4 w-4 text-gray-400" />
+                                            : <ChevronRight className="h-4 w-4 text-gray-400" />
+                                        }
+                                    </div>
+                                </button>
 
-                        {/* Modal Content */}
-                        <div className="p-6 space-y-4">
-                            <p className="text-sm text-gray-600 leading-relaxed">
-                                Deseja enviar o template{' '}
-                                <span className="font-bold text-primary">"{dispatchingTemplate.name}"</span>{' '}
-                                para todos os{' '}
-                                <span className="font-bold text-gray-800 uppercase">
-                                    {audienceChoices[dispatchingTemplate.name] || 'leads'}
-                                </span>{' '}
-                                ativos?
-                            </p>
-
-                            {/* Upload de imagem — obrigatório para templates com IMAGE/DOCUMENT header */}
-                            {dispatchingTemplate.has_media_header && (
-                                <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-1.5">
-                                        {dispatchingTemplate.header_format === 'DOCUMENT' ? 'PDF' : 'Imagem'} da campanha
-                                        <span className="text-red-500 ml-1">*</span>
-                                    </label>
-
-                                    <input
-                                        ref={dispatchFileRef}
-                                        type="file"
-                                        className="hidden"
-                                        accept={dispatchingTemplate.header_format === 'DOCUMENT' ? 'application/pdf' : 'image/jpeg,image/png,image/webp'}
-                                        onChange={handleDispatchFileChange}
-                                    />
-
-                                    {dispatchImageUrl ? (
-                                        <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-xl">
-                                            {dispatchingTemplate.header_format !== 'DOCUMENT' && (
-                                                <img src={dispatchImageUrl} alt="preview" className="h-12 w-12 object-cover rounded-lg border border-green-200 flex-shrink-0" />
-                                            )}
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-xs font-bold text-green-700 truncate">Imagem carregada</p>
-                                                <p className="text-[10px] text-green-600 truncate">{dispatchImageUrl.split('/').pop()}</p>
+            {/* Detalhe expandido */ }
+                            {
+                                isExpanded && (
+                                    <div className="px-5 pb-4 bg-gray-50/50 border-t border-gray-100">
+                                        {loadingEnvios === camp.id ? (
+                                            <div className="py-4 flex justify-center">
+                                                <Loader2 className="h-5 w-5 animate-spin text-primary/40" />
                                             </div>
-                                            <button
-                                                type="button"
-                                                onClick={() => dispatchFileRef.current?.click()}
-                                                className="text-[11px] text-green-600 font-bold hover:underline flex-shrink-0"
-                                            >
-                                                Trocar
-                                            </button>
+                                        ) : !envios || envios.length === 0 ? (
+                                            <p className="text-xs text-gray-400 py-3">Nenhum envio registrado para esta campanha.</p>
+                                        ) : (
+                                            <div className="mt-3 space-y-1.5">
+                                                <div className="grid grid-cols-3 gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider px-3 pb-1">
+                                                    <span>Destinatário</span>
+                                                    <span>Status</span>
+                                                    <span>Detalhe</span>
+                                                </div>
+                                                {envios.map((envio, idx) => (
+                                                    <div key={envio.id || idx} className="grid grid-cols-3 gap-2 items-center px-3 py-2 bg-white rounded-lg border border-gray-100 text-xs">
+                                                        <span className="font-medium text-gray-700 truncate">{envio.destinatario_nome}</span>
+                                                        <span>
+                                                            {envio.status === 'enviado' ? (
+                                                                <span className="inline-flex items-center gap-1 text-green-600 font-bold">
+                                                                    <CheckCircle2 className="h-3 w-3" /> Enviado
+                                                                </span>
+                                                            ) : envio.status === 'erro' ? (
+                                                                <span className="inline-flex items-center gap-1 text-red-500 font-bold">
+                                                                    <XCircle className="h-3 w-3" /> Erro
+                                                                </span>
+                                                            ) : (
+                                                                <span className="inline-flex items-center gap-1 text-amber-500 font-bold">
+                                                                    <Clock className="h-3 w-3" /> Pendente
+                                                                </span>
+                                                            )}
+                                                        </span>
+                                                        <span className="text-gray-400 truncate">
+                                                            {envio.status === 'erro' && envio.mensagem_erro
+                                                                ? envio.mensagem_erro
+                                                                : envio.status === 'enviado' && envio.enviado_at
+                                                                    ? new Date(envio.enviado_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+                                                                    : '—'
+                                                        </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )
+                            }
+                                </li>
+                );
+                        })}
+            </ul>
+                )}
+        </div>
+
+    {/* ── DISPATCH CONFIRMATION MODAL (Simplified) ──── */ }
+    {
+        dispatchingTemplate && (
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
+                    {/* Modal Header */}
+                    <div className="bg-gray-50/80 px-6 py-4 flex items-center justify-between border-b border-gray-100">
+                        <div className="flex items-center gap-2">
+                            <Rocket className="h-5 w-5 text-primary" />
+                            <h3 className="font-bold text-gray-800">Confirmar Disparo</h3>
+                        </div>
+                        <button
+                            onClick={() => setDispatchingTemplate(null)}
+                            className="p-1.5 hover:bg-gray-200 rounded-lg text-gray-400 transition-colors"
+                        >
+                            <X className="h-5 w-5" />
+                        </button>
+                    </div>
+
+                    {/* Modal Content */}
+                    <div className="p-6 space-y-4">
+                        <p className="text-sm text-gray-600 leading-relaxed">
+                            Deseja enviar o template{' '}
+                            <span className="font-bold text-primary">"{dispatchingTemplate.name}"</span>{' '}
+                            para todos os{' '}
+                            <span className="font-bold text-gray-800 uppercase">
+                                {audienceChoices[dispatchingTemplate.name] || 'leads'}
+                            </span>{' '}
+                            ativos?
+                        </p>
+
+                        {/* Upload de imagem — obrigatório para templates com IMAGE/DOCUMENT header */}
+                        {dispatchingTemplate.has_media_header && (
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1.5">
+                                    {dispatchingTemplate.header_format === 'DOCUMENT' ? 'PDF' : 'Imagem'} da campanha
+                                    <span className="text-red-500 ml-1">*</span>
+                                </label>
+
+                                <input
+                                    ref={dispatchFileRef}
+                                    type="file"
+                                    className="hidden"
+                                    accept={dispatchingTemplate.header_format === 'DOCUMENT' ? 'application/pdf' : 'image/jpeg,image/png,image/webp'}
+                                    onChange={handleDispatchFileChange}
+                                />
+
+                                {dispatchImageUrl ? (
+                                    <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-xl">
+                                        {dispatchingTemplate.header_format !== 'DOCUMENT' && (
+                                            <img src={dispatchImageUrl} alt="preview" className="h-12 w-12 object-cover rounded-lg border border-green-200 flex-shrink-0" />
+                                        )}
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-xs font-bold text-green-700 truncate">Imagem carregada</p>
+                                            <p className="text-[10px] text-green-600 truncate">{dispatchImageUrl.split('/').pop()}</p>
                                         </div>
-                                    ) : (
                                         <button
                                             type="button"
                                             onClick={() => dispatchFileRef.current?.click()}
-                                            disabled={dispatchUploading}
-                                            className="w-full border-2 border-dashed border-gray-200 rounded-xl bg-gray-50 hover:bg-primary/5 hover:border-primary/40 transition-all p-4 flex flex-col items-center gap-2 disabled:opacity-50"
+                                            className="text-[11px] text-green-600 font-bold hover:underline flex-shrink-0"
                                         >
-                                            {dispatchUploading ? (
-                                                <><Loader2 className="h-6 w-6 animate-spin text-primary/40" /><span className="text-xs text-gray-400">Fazendo upload...</span></>
-                                            ) : (
-                                                <><UploadCloud className="h-6 w-6 text-gray-300" /><span className="text-xs font-medium text-gray-500">Clique para selecionar a {dispatchingTemplate.header_format === 'DOCUMENT' ? 'PDF' : 'imagem'}</span></>
-                                            )}
+                                            Trocar
                                         </button>
-                                    )}
-                                </div>
-                            )}
-
-                            <div className="bg-amber-50 rounded-xl p-3 border border-amber-200">
-                                <p className="text-xs text-amber-700">
-                                    ⚠️ As mensagens serão enviadas em lotes paralelos. Para 757 leads, o processo leva cerca de 1-2 minutos.
-                                </p>
+                                    </div>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={() => dispatchFileRef.current?.click()}
+                                        disabled={dispatchUploading}
+                                        className="w-full border-2 border-dashed border-gray-200 rounded-xl bg-gray-50 hover:bg-primary/5 hover:border-primary/40 transition-all p-4 flex flex-col items-center gap-2 disabled:opacity-50"
+                                    >
+                                        {dispatchUploading ? (
+                                            <><Loader2 className="h-6 w-6 animate-spin text-primary/40" /><span className="text-xs text-gray-400">Fazendo upload...</span></>
+                                        ) : (
+                                            <><UploadCloud className="h-6 w-6 text-gray-300" /><span className="text-xs font-medium text-gray-500">Clique para selecionar a {dispatchingTemplate.header_format === 'DOCUMENT' ? 'PDF' : 'imagem'}</span></>
+                                        )}
+                                    </button>
+                                )}
                             </div>
-                        </div>
+                        )}
 
-                        {/* Modal Footer */}
-                        <div className="px-6 pb-6 flex gap-3">
-                            <button
-                                onClick={() => setDispatchingTemplate(null)}
-                                className="flex-1 py-3 px-4 rounded-xl font-bold text-sm text-gray-500 hover:bg-gray-100 transition-colors"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={handleConfirmDispatch}
-                                disabled={isSendingCampaign}
-                                className="flex-[2] bg-primary text-white py-3 px-4 rounded-xl font-bold text-sm shadow-md hover:bg-primary/90 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                            >
-                                {isSendingCampaign ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                                {isSendingCampaign ? 'Enviando...' : 'Confirmar Envio'}
-                            </button>
+                        <div className="bg-amber-50 rounded-xl p-3 border border-amber-200">
+                            <p className="text-xs text-amber-700">
+                                ⚠️ As mensagens serão enviadas em lotes paralelos. Para 757 leads, o processo leva cerca de 1-2 minutos.
+                            </p>
                         </div>
                     </div>
+
+                    {/* Modal Footer */}
+                    <div className="px-6 pb-6 flex gap-3">
+                        <button
+                            onClick={() => setDispatchingTemplate(null)}
+                            className="flex-1 py-3 px-4 rounded-xl font-bold text-sm text-gray-500 hover:bg-gray-100 transition-colors"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            onClick={handleConfirmDispatch}
+                            disabled={isSendingCampaign}
+                            className="flex-[2] bg-primary text-white py-3 px-4 rounded-xl font-bold text-sm shadow-md hover:bg-primary/90 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                            {isSendingCampaign ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                            {isSendingCampaign ? 'Enviando...' : 'Confirmar Envio'}
+                        </button>
+                    </button>
                 </div>
-            )}
-        </div>
+            </div>
+            </div >
+        )
+    }
+        </div >
     );
 }
