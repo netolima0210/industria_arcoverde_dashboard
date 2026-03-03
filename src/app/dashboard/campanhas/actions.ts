@@ -354,7 +354,13 @@ async function fetchTemplateComponents(templateName: string) {
             console.error('[fetchTemplateComponents] Error:', JSON.stringify(data));
             return null;
         }
-        return data.data[0].components as Array<{ type: string; format?: string; text?: string; buttons?: any[] }>;
+        return data.data[0].components as Array<{
+            type: string;
+            format?: string;
+            text?: string;
+            buttons?: any[];
+            example?: { header_handle?: string[] };
+        }>;
     } catch (err) {
         console.error('[fetchTemplateComponents] Exception:', err);
         return null;
@@ -427,16 +433,24 @@ export async function sendCampaign(campaignId: string) {
         if (!templateComponents) return sendComponents;
         for (const comp of templateComponents) {
             if (comp.type === 'HEADER') {
-                if (comp.format === 'IMAGE' && campaign.imagem_url) {
-                    sendComponents.push({
-                        type: 'header',
-                        parameters: [{ type: 'image', image: { link: campaign.imagem_url } }]
-                    });
-                } else if (comp.format === 'DOCUMENT' && campaign.imagem_url) {
-                    sendComponents.push({
-                        type: 'header',
-                        parameters: [{ type: 'document', document: { link: campaign.imagem_url, filename: 'documento.pdf' } }]
-                    });
+                if (comp.format === 'IMAGE') {
+                    // Usa imagem_url da campanha ou a header_handle do template aprovado como fallback.
+                    // O header_handle é buscado fresh da Meta API a cada disparo, então a URL é válida.
+                    const imageUrl = campaign.imagem_url || comp.example?.header_handle?.[0];
+                    if (imageUrl) {
+                        sendComponents.push({
+                            type: 'header',
+                            parameters: [{ type: 'image', image: { link: imageUrl } }]
+                        });
+                    }
+                } else if (comp.format === 'DOCUMENT') {
+                    const docUrl = campaign.imagem_url || comp.example?.header_handle?.[0];
+                    if (docUrl) {
+                        sendComponents.push({
+                            type: 'header',
+                            parameters: [{ type: 'document', document: { link: docUrl, filename: 'documento.pdf' } }]
+                        });
+                    }
                 }
                 // HEADER TEXT estático não precisa de parâmetros
             } else if (comp.type === 'BODY') {

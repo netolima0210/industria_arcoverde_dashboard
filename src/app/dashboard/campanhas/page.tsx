@@ -185,10 +185,8 @@ export default function CampanhasPage() {
         if (!dispatchingTemplate) return;
         const audience = audienceChoices[dispatchingTemplate.name] || 'leads';
 
-        if (dispatchingTemplate.has_media_header && !dispatchImageUrl.trim()) {
-            alert('Este template requer uma URL de imagem para ser enviado.');
-            return;
-        }
+        // URL de imagem é opcional: se não informada, o sendCampaign usa o header_handle
+        // do próprio template aprovado como fallback automático.
 
         setIsSendingCampaign(true);
 
@@ -719,23 +717,22 @@ export default function CampanhasPage() {
                                 ativos?
                             </p>
 
-                            {/* Campo de URL de imagem — exibido apenas quando o template tem header de mídia */}
+                            {/* Campo de URL de imagem — opcional, usa a imagem do template aprovado se não preenchido */}
                             {dispatchingTemplate.has_media_header && (
                                 <div>
                                     <label className="block text-sm font-bold text-gray-700 mb-1.5">
-                                        URL da {dispatchingTemplate.header_format === 'DOCUMENT' ? 'PDF' : 'Imagem'}{' '}
-                                        <span className="text-red-500">*</span>
+                                        Trocar {dispatchingTemplate.header_format === 'DOCUMENT' ? 'PDF' : 'Imagem'}{' '}
+                                        <span className="text-gray-400 font-normal">(opcional)</span>
                                     </label>
                                     <input
                                         type="url"
-                                        required
                                         value={dispatchImageUrl}
                                         onChange={e => setDispatchImageUrl(e.target.value)}
                                         placeholder="https://exemplo.com/imagem.jpg"
                                         className="block w-full rounded-xl border-gray-200 bg-gray-50 shadow-sm focus:border-primary focus:ring-primary focus:bg-white transition-all text-sm p-3 border"
                                     />
                                     <p className="text-[10px] text-gray-400 mt-1">
-                                        Informe a URL pública da {dispatchingTemplate.header_format === 'DOCUMENT' ? 'PDF' : 'imagem'} a ser enviada com a mensagem.
+                                        Deixe em branco para enviar com a mesma imagem do template aprovado.
                                     </p>
                                 </div>
                             )}
