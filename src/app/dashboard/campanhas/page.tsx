@@ -13,6 +13,8 @@ type Template = {
     status: string;
     category: string;
     language: string;
+    has_media_header?: boolean;
+    header_format?: string;
 };
 
 type Campanha = {
@@ -86,6 +88,7 @@ export default function CampanhasPage() {
     const [dispatchingTemplate, setDispatchingTemplate] = useState<Template | null>(null);
     const [audienceChoices, setAudienceChoices] = useState<Record<string, 'leads' | 'vendedores'>>({});
     const [isSendingCampaign, setIsSendingCampaign] = useState(false);
+    const [dispatchImageUrl, setDispatchImageUrl] = useState('');
 
     // Campanhas enviadas
     const [campanhas, setCampanhas] = useState<Campanha[]>([]);
@@ -175,17 +178,24 @@ export default function CampanhasPage() {
 
     const handleOpenDispatch = (tpl: Template) => {
         setDispatchingTemplate(tpl);
+        setDispatchImageUrl('');
     };
 
     const handleConfirmDispatch = async () => {
         if (!dispatchingTemplate) return;
         const audience = audienceChoices[dispatchingTemplate.name] || 'leads';
 
+        if (dispatchingTemplate.has_media_header && !dispatchImageUrl.trim()) {
+            alert('Este template requer uma URL de imagem para ser enviado.');
+            return;
+        }
+
         setIsSendingCampaign(true);
 
         const formData = new FormData();
         formData.set('template_name', dispatchingTemplate.name);
         formData.set('audience', audience);
+        if (dispatchImageUrl.trim()) formData.set('image_url', dispatchImageUrl.trim());
 
         try {
             const result = await dispatchCampaign(formData);
@@ -708,6 +718,27 @@ export default function CampanhasPage() {
                                 </span>{' '}
                                 ativos?
                             </p>
+
+                            {/* Campo de URL de imagem — exibido apenas quando o template tem header de mídia */}
+                            {dispatchingTemplate.has_media_header && (
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-1.5">
+                                        URL da {dispatchingTemplate.header_format === 'DOCUMENT' ? 'PDF' : 'Imagem'}{' '}
+                                        <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="url"
+                                        required
+                                        value={dispatchImageUrl}
+                                        onChange={e => setDispatchImageUrl(e.target.value)}
+                                        placeholder="https://exemplo.com/imagem.jpg"
+                                        className="block w-full rounded-xl border-gray-200 bg-gray-50 shadow-sm focus:border-primary focus:ring-primary focus:bg-white transition-all text-sm p-3 border"
+                                    />
+                                    <p className="text-[10px] text-gray-400 mt-1">
+                                        Informe a URL pública da {dispatchingTemplate.header_format === 'DOCUMENT' ? 'PDF' : 'imagem'} a ser enviada com a mensagem.
+                                    </p>
+                                </div>
+                            )}
 
                             <div className="bg-amber-50 rounded-xl p-3 border border-amber-200">
                                 <p className="text-xs text-amber-700">

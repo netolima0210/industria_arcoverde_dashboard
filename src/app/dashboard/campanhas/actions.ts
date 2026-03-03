@@ -65,6 +65,7 @@ export async function createCampaign(formData: FormData) {
 export async function dispatchCampaign(formData: FormData) {
     const templateName = formData.get('template_name') as string;
     const audience = formData.get('audience') as string;
+    const imageUrl = formData.get('image_url') as string | null;
 
     if (!templateName || !audience) {
         return { error: 'Dados incompletos para o disparo.', success: false };
@@ -81,6 +82,7 @@ export async function dispatchCampaign(formData: FormData) {
     campaignFormData.set('nome', campanhaName);
     campaignFormData.set('mensagem', templateName); // Store template name in mensagem field
     campaignFormData.set('publico_alvo', audience);
+    if (imageUrl) campaignFormData.set('imagem_url', imageUrl);
 
     const createResult = await createCampaign(campaignFormData);
     if (createResult.error) return { error: createResult.error, success: false };
@@ -306,7 +308,7 @@ export async function listTemplatesMeta() {
 
     try {
         const response = await fetch(
-            `${META_API_URL}/${wabaId}/message_templates?fields=name,status,category,language&limit=50`,
+            `${META_API_URL}/${wabaId}/message_templates?fields=name,status,category,language,components&limit=50`,
             { headers: { 'Authorization': `Bearer ${token}` }, cache: 'no-store' }
         );
 
@@ -316,7 +318,21 @@ export async function listTemplatesMeta() {
             return { error: data.error?.message || 'Erro ao buscar templates.', templates: [] };
         }
 
-        return { templates: data.data as { name: string; status: string; category: string; language: string }[] };
+        const templates = (data.data as any[]).map(t => {
+            const headerComp = (t.components || []).find((c: any) => c.type === 'HEADER');
+            const headerFormat: string = headerComp?.format || 'NONE';
+            const has_media_header = ['IMAGE', 'DOCUMENT', 'VIDEO'].includes(headerFormat);
+            return {
+                name: t.name as string,
+                status: t.status as string,
+                category: t.category as string,
+                language: t.language as string,
+                has_media_header,
+                header_format: headerFormat,
+            };
+        });
+
+        return { templates };
     } catch {
         return { error: 'Falha na comunicação com a API da Meta.', templates: [] };
     }
@@ -404,69 +420,64 @@ export async function sendCampaign(campaignId: string) {
     let enviados = 0;
     let erros = 0;
 
-    for (const target of targets) {
+    // Função para construir os componentes de envio com base no template aprovado.
+    // Só inclui componentes que têm parâmetros variáveis.
+    function buildSendComponents(target: { name: string | null }) {
+        const sendComponents: any[] = [];
+        if (!templateComponents) return sendComponents;
+        for (const comp of templateComponents) {
+            if (comp.type === 'HEADER') {
+                if (comp.format === 'IMAGE' && campaign.imagem_url) {
+                    sendComponents.push({
+                        type: 'header',
+                        parameters: [{ type: 'image', image: { link: campaign.imagem_url } }]
+                    });
+                } else if (comp.format === 'DOCUMENT' && campaign.imagem_url) {
+                    sendComponents.push({
+                        type: 'header',
+                        parameters: [{ type: 'document', document: { link: campaign.imagem_url, filename: 'documento.pdf' } }]
+                    });
+                }
+                // HEADER TEXT estático não precisa de parâmetros
+            } else if (comp.type === 'BODY') {
+                const vars = (comp.text || '').match(/\{\{\d+\}\}/g);
+                if (vars && vars.length > 0) {
+                    sendComponents.push({
+                        type: 'body',
+                        parameters: vars.map((_, i) => ({
+                            type: 'text',
+                            text: i === 0 ? (target.name || 'Cliente') : ''
+                        }))
+                    });
+                }
+            }
+            // FOOTER e BUTTONS estáticos não precisam de parâmetros
+        }
+        return sendComponents;
+    }
+
+    // Função para enviar para um único destinatário e atualizar o status no Supabase.
+    async function sendToTarget(target: { id: string; phone: string | null; name: string | null }): Promise<boolean> {
         if (!target.phone) {
-            erros++;
             await supabase.from('campanhas_envios')
                 .update({ status: 'erro', mensagem_erro: 'Sem número de telefone' })
                 .eq('campanha_id', campaignId)
                 .eq(idField, target.id);
-            continue;
+            return false;
         }
 
-        // Clean phone number
         const cleanPhone = target.phone.replace(/\D/g, '');
         const fullPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
 
         try {
-            // Construir os componentes de envio com base nos componentes do template aprovado.
-            // Só componentes com parâmetros variáveis precisam ser enviados.
-            const sendComponents: any[] = [];
-            if (templateComponents) {
-                for (const comp of templateComponents) {
-                    if (comp.type === 'HEADER') {
-                        if (comp.format === 'IMAGE') {
-                            const imageUrl = campaign.imagem_url;
-                            if (imageUrl) {
-                                sendComponents.push({
-                                    type: 'header',
-                                    parameters: [{ type: 'image', image: { link: imageUrl } }]
-                                });
-                            }
-                        } else if (comp.format === 'DOCUMENT') {
-                            const docUrl = campaign.imagem_url;
-                            if (docUrl) {
-                                sendComponents.push({
-                                    type: 'header',
-                                    parameters: [{ type: 'document', document: { link: docUrl, filename: 'documento.pdf' } }]
-                                });
-                            }
-                        }
-                        // HEADER TEXT estático não precisa de parâmetros
-                    } else if (comp.type === 'BODY') {
-                        // Detectar variáveis {{1}}, {{2}}, etc. no texto do body
-                        const vars = (comp.text || '').match(/\{\{\d+\}\}/g);
-                        if (vars && vars.length > 0) {
-                            const params = vars.map((_, i) => ({
-                                type: 'text',
-                                text: i === 0 ? (target.name || 'Cliente') : ''
-                            }));
-                            sendComponents.push({ type: 'body', parameters: params });
-                        }
-                        // BODY estático (sem variáveis) não precisa de parâmetros
-                    }
-                    // FOOTER e BUTTONS estáticos não precisam de parâmetros
-                }
-            }
-
             const messagePayload = {
                 messaging_product: 'whatsapp',
                 to: fullPhone,
                 type: 'template',
                 template: {
-                    name: campaign.mensagem, // template name está armazenado no campo mensagem
+                    name: campaign.mensagem,
                     language: { code: 'pt_BR' },
-                    components: sendComponents
+                    components: buildSendComponents(target)
                 }
             };
 
@@ -482,19 +493,14 @@ export async function sendCampaign(campaignId: string) {
             const data = await response.json();
 
             if (response.ok) {
-                enviados++;
                 await supabase.from('campanhas_envios')
                     .update({ status: 'enviado', enviado_at: new Date().toISOString() })
                     .eq('campanha_id', campaignId)
                     .eq(idField, target.id);
+                return true;
             } else {
-                erros++;
-                // Log completo para diagnóstico — visível nos logs da Vercel
                 console.error('[sendCampaign] Meta API error:', JSON.stringify({
-                    phoneId,
-                    to: fullPhone,
-                    template: campaign.mensagem,
-                    error: data.error
+                    phoneId, to: fullPhone, template: campaign.mensagem, error: data.error
                 }));
                 const errCode = data.error?.code ? ` [código ${data.error.code}]` : '';
                 const errMsg = data.error?.message || 'Erro desconhecido';
@@ -502,17 +508,29 @@ export async function sendCampaign(campaignId: string) {
                     .update({ status: 'erro', mensagem_erro: `${errMsg}${errCode}` })
                     .eq('campanha_id', campaignId)
                     .eq(idField, target.id);
+                return false;
             }
-        } catch (err) {
-            erros++;
+        } catch {
             await supabase.from('campanhas_envios')
                 .update({ status: 'erro', mensagem_erro: 'Falha na conexão' })
                 .eq('campanha_id', campaignId)
                 .eq(idField, target.id);
+            return false;
         }
+    }
 
-        // Delay de 15 segundos para evitar banimento (High Quality Messages)
-        await new Promise(resolve => setTimeout(resolve, 15000));
+    // Envio em lotes de 5 paralelos + 300ms entre lotes para não sobrecarregar a API da Meta.
+    // 757 leads / 5 = ~152 lotes × ~500ms = ~76s total (muito abaixo do limit de 300s da Vercel).
+    const BATCH_SIZE = 5;
+    for (let i = 0; i < targets.length; i += BATCH_SIZE) {
+        const batch = targets.slice(i, i + BATCH_SIZE);
+        const results = await Promise.all(batch.map(t => sendToTarget(t)));
+        enviados += results.filter(Boolean).length;
+        erros += results.filter(r => !r).length;
+
+        if (i + BATCH_SIZE < targets.length) {
+            await new Promise(resolve => setTimeout(resolve, 300));
+        }
     }
 
     // Final update
@@ -570,23 +588,21 @@ export async function getCampanhaEnvios(campanhaId: string) {
     }
 
     // Enriquecer com nome dos destinatários
+    // Busca em batches de 50 para evitar URL muito longa na API REST do Supabase
     const isLeads = campanha.publico_alvo === 'leads';
     const ids = (envios || []).map(e => isLeads ? e.lead_id : e.vendedor_id).filter(Boolean);
 
     let namesMap: Record<string, string> = {};
     if (ids.length > 0) {
-        if (isLeads) {
-            const { data: clientes } = await supabase
-                .from('clientes')
-                .select('id, nome, contato')
-                .in('id', ids);
-            (clientes || []).forEach(c => { namesMap[c.id] = c.nome; });
-        } else {
-            const { data: vendedores } = await supabase
-                .from('vendedores')
-                .select('id, nome, telefone')
-                .in('id', ids);
-            (vendedores || []).forEach(v => { namesMap[v.id] = v.nome; });
+        const CHUNK = 50;
+        const table = isLeads ? 'clientes' : 'vendedores';
+        for (let i = 0; i < ids.length; i += CHUNK) {
+            const chunk = ids.slice(i, i + CHUNK);
+            const { data: rows } = await supabase
+                .from(table)
+                .select('id, nome')
+                .in('id', chunk);
+            (rows || []).forEach((r: { id: string; nome: string }) => { namesMap[r.id] = r.nome; });
         }
     }
 
