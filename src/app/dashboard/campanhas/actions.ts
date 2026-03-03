@@ -146,16 +146,31 @@ export async function dispatchCampaign(formData: FormData) {
 }
 
 // ─── Delete Campaign ──────────────────────────────
-export async function deleteCampaign(id: string) {
+export async function deleteCampaign(campaignId: string) {
     const supabase = await createClient();
-    const { error } = await supabase.from('campanhas').delete().eq('id', id);
+
+    const { error: errorEnvios } = await supabase
+        .from('campanhas_envios')
+        .delete()
+        .eq('campanha_id', campaignId);
+
+    if (errorEnvios) {
+        console.error('Erro ao limpar envios:', errorEnvios);
+        return { error: 'Não foi possível limpar o histórico de envios.' };
+    }
+
+    const { error } = await supabase
+        .from('campanhas')
+        .delete()
+        .eq('id', campaignId);
 
     if (error) {
-        console.error('Error deleting campaign:', error);
-        throw new Error('Erro ao deletar campanha.');
+        console.error('Erro ao excluir campanha:', error);
+        return { error: 'Não foi possível excluir a campanha.' };
     }
 
     revalidatePath('/dashboard/campanhas');
+    return {};
 }
 
 // ─── Upload Media to Meta (Resumable Upload API) ──
