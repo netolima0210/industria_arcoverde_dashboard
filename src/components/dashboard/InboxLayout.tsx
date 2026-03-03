@@ -20,15 +20,33 @@ interface Mensagem {
 
 export function InboxLayout({ clientes }: { clientes: Cliente[] }) {
     const [search, setSearch] = useState('');
+    const [dateRange, setDateRange] = useState({ start: '', end: '' });
     const [selectedClient, setSelectedClient] = useState<Cliente | null>(null);
     const [messages, setMessages] = useState<Mensagem[]>([]);
     const [loading, setLoading] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const filtered = clientes.filter(c => {
-        if (!search.trim()) return true;
+        // Filtro de busca (Nome ou Telefone)
         const q = search.toLowerCase();
-        return (c.nome?.toLowerCase() || '').includes(q) || (c.contato || '').includes(q);
+        const matchesSearch = !search.trim() ||
+            (c.nome?.toLowerCase() || '').includes(q) ||
+            (c.contato || '').includes(q);
+
+        // Filtro de Data
+        let matchesDate = true;
+        if (c.last_message_at) {
+            const d = new Date(c.last_message_at);
+            // Formatar YYYY-MM-DD usando data local para bater com o input date
+            const msgDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+            if (dateRange.start && msgDate < dateRange.start) matchesDate = false;
+            if (dateRange.end && msgDate > dateRange.end) matchesDate = false;
+        } else if (dateRange.start || dateRange.end) {
+            matchesDate = false;
+        }
+
+        return matchesSearch && matchesDate;
     });
 
     useEffect(() => {
@@ -76,19 +94,54 @@ export function InboxLayout({ clientes }: { clientes: Cliente[] }) {
     return (
         <div className="flex h-[calc(100vh-140px)] bg-white rounded-2xl shadow-sm border border-gray-200/60 overflow-hidden">
             {/* Lado Esquerdo - Contatos */}
-            <div className="w-1/3 min-w-[300px] border-r border-gray-100 flex flex-col bg-gray-50/30">
+            <div className="w-[380px] flex-shrink-0 border-r border-gray-100 flex flex-col bg-gray-50/30">
                 {/* Cabeçalho Esquerda */}
                 <div className="p-4 border-b border-gray-100 bg-white">
                     <h2 className="text-lg font-bold text-gray-800 mb-4">Leads & Contatos</h2>
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                        <input
-                            type="text"
-                            value={search}
-                            onChange={e => setSearch(e.target.value)}
-                            placeholder="Buscar contato..."
-                            className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 transition-all shadow-sm"
-                        />
+
+                    <div className="space-y-3 mb-4">
+                        <div className="grid grid-cols-2 gap-2">
+                            <div className="relative">
+                                <span className="absolute -top-1.5 left-2 bg-white px-1 text-[9px] uppercase font-bold text-gray-400 z-10">De</span>
+                                <input
+                                    type="date"
+                                    value={dateRange.start}
+                                    onChange={e => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                                    className="w-full px-2 py-2 rounded-lg border border-gray-200 bg-gray-50 text-xs focus:outline-none focus:ring-1 focus:ring-primary/30"
+                                />
+                            </div>
+                            <div className="relative">
+                                <span className="absolute -top-1.5 left-2 bg-white px-1 text-[9px] uppercase font-bold text-gray-400 z-10">Até</span>
+                                <input
+                                    type="date"
+                                    value={dateRange.end}
+                                    onChange={e => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                                    className="w-full px-2 py-2 rounded-lg border border-gray-200 bg-gray-50 text-xs focus:outline-none focus:ring-1 focus:ring-primary/30"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="relative flex items-center gap-2">
+                            <div className="relative flex-1">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                <input
+                                    type="text"
+                                    value={search}
+                                    onChange={e => setSearch(e.target.value)}
+                                    placeholder="Buscar..."
+                                    className="w-full pl-9 pr-4 py-2 rounded-xl border border-gray-200 bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 transition-all shadow-sm"
+                                />
+                            </div>
+                            {(dateRange.start || dateRange.end) && (
+                                <button
+                                    onClick={() => setDateRange({ start: '', end: '' })}
+                                    className="p-2 text-gray-400 hover:text-red-500 transition-colors bg-gray-50 border border-gray-200 rounded-xl"
+                                    title="Limpar Datas"
+                                >
+                                    <RefreshCw className="h-4 w-4" />
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
 

@@ -51,32 +51,68 @@ export default async function ConversasPage() {
         }
     }
 
-    // 4. Enriquecer cada lead com a data da última conversa
-    const clientesWithLastMsg = (clientes || []).map(c => {
+    // 4. Agrupar TUDO por número de telefone (sessions das conversas + leads cadastrados)
+    const groupedClientsMap = new Map<string, any>();
+
+    // Primeiro, pegar todas as sessões que tiveram conversa
+    for (const [posixPhone, date] of lastMessageMap) {
+        groupedClientsMap.set(posixPhone, {
+            id: Math.random(), // ID temporário para lista de quem não é cliente
+            nome: posixPhone, // Padrão: mostra o número
+            contato: posixPhone,
+            normalized_phone: posixPhone,
+            last_message_at: date,
+            is_desconhecido: true
+        });
+    }
+
+    // Depois, sobrepor com os dados dos clientes cadastrados
+    for (const c of (clientes || [])) {
         const contatoDigits = (c.contato || '').replace(/\D/g, '');
         const normalized = normalizePhone(contatoDigits);
+        if (!normalized) continue;
 
-        // Tentar match direto ou parcial (endsWith)
-        let lastMsg = lastMessageMap.get(normalized) || '';
-        if (!lastMsg) {
-            for (const [phone, date] of lastMessageMap) {
-                if (phone.endsWith(contatoDigits) || contatoDigits.endsWith(phone) || phone === contatoDigits) {
-                    lastMsg = date;
-                    break;
+        const existing = groupedClientsMap.get(normalized);
+        const lastMsg = lastMessageMap.get(normalized) || (existing?.last_message_at) || '';
+
+        if (existing) {
+            // Se já existia pela conversa, apenas atualizamos o nome
+            if (existing.is_desconhecido) {
+                existing.nome = c.nome;
+                existing.id = c.id;
+                existing.is_desconhecido = false;
+            } else if (!existing.nome.includes(c.nome)) {
+                existing.nome = `${existing.nome} / ${c.nome}`;
+            }
+        } else {
+            // Se o cliente existe mas não achamos conversa direta (tentar match parcial)
+            let foundDate = lastMsg;
+            if (!foundDate) {
+                for (const [phone, date] of lastMessageMap) {
+                    if (phone.endsWith(normalized) || normalized.endsWith(phone)) {
+                        foundDate = date;
+                        break;
+                    }
                 }
             }
+
+            if (foundDate) {
+                groupedClientsMap.set(normalized, {
+                    id: c.id,
+                    nome: c.nome || 'Sem Nome',
+                    contato: c.contato,
+                    normalized_phone: normalized,
+                    last_message_at: foundDate,
+                    is_desconhecido: false
+                });
+            }
         }
-        return { ...c, last_message_at: lastMsg };
-    });
+    }
 
-    // 5. Ordenar: quem conversou mais recente fica no topo, sem conversa fica no final
-    // Filtrar: só quem já conversou aparece (igual WhatsApp)
-    const clientesComConversa = clientesWithLastMsg.filter(c => c.last_message_at);
-
-    // Ordenar: mais recente no topo
-    clientesComConversa.sort((a, b) => {
-        return b.last_message_at!.localeCompare(a.last_message_at!);
-    });
+    // 5. Filtrar e Ordenar: mais recente no topo
+    const finalClientes = Array.from(groupedClientsMap.values())
+        .filter(c => c.last_message_at)
+        .sort((a, b) => b.last_message_at.localeCompare(a.last_message_at));
 
     return (
         <div className="space-y-6">
@@ -85,7 +121,7 @@ export default async function ConversasPage() {
                 <p className="text-sm text-gray-500">Histórico de conversas completo por lead cadastrado.</p>
             </div>
 
-            <InboxLayout clientes={clientesComConversa} />
+            <InboxLayout clientes={finalClientes} />
         </div>
     );
 }
