@@ -537,7 +537,7 @@ export default function CampanhasPage() {
                                                     }`}
                                             >
                                                 <Users className="h-3 w-3" />
-                                                Leads
+                                                <span translate="no">Leads</span>
                                             </button>
                                             <button
                                                 onClick={() => toggleAudience(tpl.name, 'vendedores')}
