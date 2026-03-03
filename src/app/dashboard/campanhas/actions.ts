@@ -17,6 +17,48 @@ function createBackgroundClient() {
 }
 
 const META_API_URL = 'https://graph.facebook.com/v21.0';
+const STORAGE_BUCKET = 'campaign-media';
+
+// ─── Upload de mídia para o Supabase Storage ──────
+// Cria o bucket (se não existir) e faz upload do arquivo, retornando a URL pública.
+// Usa service role key para ter permissão de criar buckets e fazer upload.
+export async function uploadCampaignMedia(formData: FormData) {
+    const file = formData.get('file') as File | null;
+    if (!file || file.size === 0) return { error: 'Nenhum arquivo fornecido.' };
+
+    const supabase = createBackgroundClient();
+
+    // Criar o bucket como público se ainda não existir
+    const { error: bucketErr } = await supabase.storage.createBucket(STORAGE_BUCKET, {
+        public: true,
+        allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'],
+        fileSizeLimit: 5 * 1024 * 1024 // 5 MB
+    });
+    // Ignora erro de "already exists"
+    if (bucketErr && !bucketErr.message.includes('already exists')) {
+        console.error('[uploadCampaignMedia] Bucket error:', bucketErr.message);
+        return { error: 'Erro ao criar bucket de armazenamento.' };
+    }
+
+    const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+    const fileName = `template_${Date.now()}.${ext}`;
+
+    const arrayBuffer = await file.arrayBuffer();
+    const { error: uploadErr } = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .upload(fileName, arrayBuffer, {
+            contentType: file.type || 'image/jpeg',
+            upsert: false
+        });
+
+    if (uploadErr) {
+        console.error('[uploadCampaignMedia] Upload error:', uploadErr.message);
+        return { error: 'Erro ao fazer upload da imagem.' };
+    }
+
+    const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(fileName);
+    return { url: data.publicUrl };
+}
 
 // ─── Create Campaign ──────────────────────────────
 export async function createCampaign(formData: FormData) {
@@ -433,24 +475,18 @@ export async function sendCampaign(campaignId: string) {
         if (!templateComponents) return sendComponents;
         for (const comp of templateComponents) {
             if (comp.type === 'HEADER') {
-                if (comp.format === 'IMAGE') {
-                    // Usa imagem_url da campanha ou a header_handle do template aprovado como fallback.
-                    // O header_handle é buscado fresh da Meta API a cada disparo, então a URL é válida.
-                    const imageUrl = campaign.imagem_url || comp.example?.header_handle?.[0];
-                    if (imageUrl) {
-                        sendComponents.push({
-                            type: 'header',
-                            parameters: [{ type: 'image', image: { link: imageUrl } }]
-                        });
-                    }
-                } else if (comp.format === 'DOCUMENT') {
-                    const docUrl = campaign.imagem_url || comp.example?.header_handle?.[0];
-                    if (docUrl) {
-                        sendComponents.push({
-                            type: 'header',
-                            parameters: [{ type: 'document', document: { link: docUrl, filename: 'documento.pdf' } }]
-                        });
-                    }
+                if (comp.format === 'IMAGE' && campaign.imagem_url) {
+                    // Requer URL pública acessível externamente (ex: Supabase Storage).
+                    // URLs de scontent.whatsapp.net (header_handle) retornam 403 para servidores externos.
+                    sendComponents.push({
+                        type: 'header',
+                        parameters: [{ type: 'image', image: { link: campaign.imagem_url } }]
+                    });
+                } else if (comp.format === 'DOCUMENT' && campaign.imagem_url) {
+                    sendComponents.push({
+                        type: 'header',
+                        parameters: [{ type: 'document', document: { link: campaign.imagem_url, filename: 'documento.pdf' } }]
+                    });
                 }
                 // HEADER TEXT estático não precisa de parâmetros
             } else if (comp.type === 'BODY') {

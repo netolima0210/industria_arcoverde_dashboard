@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { listTemplatesMeta, submitTemplateMeta, dispatchCampaign, listCampanhas, getCampanhaEnvios } from './actions';
+import { listTemplatesMeta, submitTemplateMeta, dispatchCampaign, listCampanhas, getCampanhaEnvios, uploadCampaignMedia } from './actions';
 import {
     Loader2, CheckCircle2, AlertCircle, RefreshCw,
     FileText, Image as ImageIcon, FileOutput, Send, Clock, XCircle, UploadCloud,
@@ -89,6 +89,8 @@ export default function CampanhasPage() {
     const [audienceChoices, setAudienceChoices] = useState<Record<string, 'leads' | 'vendedores'>>({});
     const [isSendingCampaign, setIsSendingCampaign] = useState(false);
     const [dispatchImageUrl, setDispatchImageUrl] = useState('');
+    const [dispatchUploading, setDispatchUploading] = useState(false);
+    const dispatchFileRef = useRef<HTMLInputElement>(null);
 
     // Campanhas enviadas
     const [campanhas, setCampanhas] = useState<Campanha[]>([]);
@@ -181,12 +183,30 @@ export default function CampanhasPage() {
         setDispatchImageUrl('');
     };
 
+    const handleDispatchFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setDispatchUploading(true);
+        const fd = new FormData();
+        fd.set('file', file);
+        const result = await uploadCampaignMedia(fd);
+        if (result.error) {
+            alert(`Erro ao fazer upload: ${result.error}`);
+        } else if (result.url) {
+            setDispatchImageUrl(result.url);
+        }
+        setDispatchUploading(false);
+        if (dispatchFileRef.current) dispatchFileRef.current.value = '';
+    };
+
     const handleConfirmDispatch = async () => {
         if (!dispatchingTemplate) return;
         const audience = audienceChoices[dispatchingTemplate.name] || 'leads';
 
-        // URL de imagem é opcional: se não informada, o sendCampaign usa o header_handle
-        // do próprio template aprovado como fallback automático.
+        if (dispatchingTemplate.has_media_header && !dispatchImageUrl.trim()) {
+            alert('Selecione a imagem da campanha antes de disparar.');
+            return;
+        }
 
         setIsSendingCampaign(true);
 
@@ -717,29 +737,59 @@ export default function CampanhasPage() {
                                 ativos?
                             </p>
 
-                            {/* Campo de URL de imagem — opcional, usa a imagem do template aprovado se não preenchido */}
+                            {/* Upload de imagem — obrigatório para templates com IMAGE/DOCUMENT header */}
                             {dispatchingTemplate.has_media_header && (
                                 <div>
                                     <label className="block text-sm font-bold text-gray-700 mb-1.5">
-                                        Trocar {dispatchingTemplate.header_format === 'DOCUMENT' ? 'PDF' : 'Imagem'}{' '}
-                                        <span className="text-gray-400 font-normal">(opcional)</span>
+                                        {dispatchingTemplate.header_format === 'DOCUMENT' ? 'PDF' : 'Imagem'} da campanha
+                                        <span className="text-red-500 ml-1">*</span>
                                     </label>
+
                                     <input
-                                        type="url"
-                                        value={dispatchImageUrl}
-                                        onChange={e => setDispatchImageUrl(e.target.value)}
-                                        placeholder="https://exemplo.com/imagem.jpg"
-                                        className="block w-full rounded-xl border-gray-200 bg-gray-50 shadow-sm focus:border-primary focus:ring-primary focus:bg-white transition-all text-sm p-3 border"
+                                        ref={dispatchFileRef}
+                                        type="file"
+                                        className="hidden"
+                                        accept={dispatchingTemplate.header_format === 'DOCUMENT' ? 'application/pdf' : 'image/jpeg,image/png,image/webp'}
+                                        onChange={handleDispatchFileChange}
                                     />
-                                    <p className="text-[10px] text-gray-400 mt-1">
-                                        Deixe em branco para enviar com a mesma imagem do template aprovado.
-                                    </p>
+
+                                    {dispatchImageUrl ? (
+                                        <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-xl">
+                                            {dispatchingTemplate.header_format !== 'DOCUMENT' && (
+                                                <img src={dispatchImageUrl} alt="preview" className="h-12 w-12 object-cover rounded-lg border border-green-200 flex-shrink-0" />
+                                            )}
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-xs font-bold text-green-700 truncate">Imagem carregada</p>
+                                                <p className="text-[10px] text-green-600 truncate">{dispatchImageUrl.split('/').pop()}</p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => dispatchFileRef.current?.click()}
+                                                className="text-[11px] text-green-600 font-bold hover:underline flex-shrink-0"
+                                            >
+                                                Trocar
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            onClick={() => dispatchFileRef.current?.click()}
+                                            disabled={dispatchUploading}
+                                            className="w-full border-2 border-dashed border-gray-200 rounded-xl bg-gray-50 hover:bg-primary/5 hover:border-primary/40 transition-all p-4 flex flex-col items-center gap-2 disabled:opacity-50"
+                                        >
+                                            {dispatchUploading ? (
+                                                <><Loader2 className="h-6 w-6 animate-spin text-primary/40" /><span className="text-xs text-gray-400">Fazendo upload...</span></>
+                                            ) : (
+                                                <><UploadCloud className="h-6 w-6 text-gray-300" /><span className="text-xs font-medium text-gray-500">Clique para selecionar a {dispatchingTemplate.header_format === 'DOCUMENT' ? 'PDF' : 'imagem'}</span></>
+                                            )}
+                                        </button>
+                                    )}
                                 </div>
                             )}
 
                             <div className="bg-amber-50 rounded-xl p-3 border border-amber-200">
                                 <p className="text-xs text-amber-700">
-                                    ⚠️ As mensagens serão enviadas com intervalo de 15 segundos entre cada uma para manter a qualidade do número.
+                                    ⚠️ As mensagens serão enviadas em lotes paralelos. Para 757 leads, o processo leva cerca de 1-2 minutos.
                                 </p>
                             </div>
                         </div>
