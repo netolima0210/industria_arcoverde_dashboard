@@ -229,7 +229,7 @@ export default function ConfiguracoesPage() {
                         </div>
                         <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
                             <p className="text-sm font-medium text-gray-700">Desenvolvido por</p>
-                            <span className="text-sm font-medium text-primary">N7tech</span>
+                            <span className="text-sm font-medium text-primary">nexseven</span>
                         </div>
                     </div>
                 </div>

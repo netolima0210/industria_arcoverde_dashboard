@@ -4,18 +4,18 @@ import { updateLead } from '../../actions';
 import Link from 'next/link';
 import { useState, useEffect, use } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, AlertTriangle } from 'lucide-react';
 
 export default function EditLeadPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
     const [loading, setLoading] = useState(false);
     const [fetching, setFetching] = useState(true);
-    const [lead, setLead] = useState<{ nome: string; contato: string; status: string } | null>(null);
+    const [lead, setLead] = useState<{ nome: string; contato: string; status: string; opt_out?: boolean } | null>(null);
 
     useEffect(() => {
         const supabase = createClient();
-        supabase.from('clientes').select('nome, contato, status').eq('id', id).single().then(({ data }) => {
-            if (data) setLead({ nome: data.nome, contato: data.contato || '', status: data.status || 'novo' });
+        supabase.from('clientes').select('nome, contato, status, opt_out').eq('id', id).single().then(({ data }) => {
+            if (data) setLead({ nome: data.nome, contato: data.contato || '', status: data.status || 'novo', opt_out: data.opt_out });
             setFetching(false);
         });
     }, [id]);
@@ -46,6 +46,12 @@ export default function EditLeadPage({ params }: { params: Promise<{ id: string 
                     <ArrowLeft className="h-5 w-5" />
                 </Link>
                 <h1 className="text-2xl font-bold text-gray-800">Editar Lead</h1>
+                {lead.opt_out && (
+                    <div className="ml-auto inline-flex items-center gap-2 bg-red-50 text-red-700 px-3 py-1.5 rounded-full text-sm font-semibold border border-red-200">
+                        <AlertTriangle className="h-4 w-4" />
+                        Opt-out / Recusou Ofertas
+                    </div>
+                )}
             </div>
 
             <div className="bg-white rounded-xl shadow-sm border p-6">
@@ -88,6 +94,7 @@ export default function EditLeadPage({ params }: { params: Promise<{ id: string 
                             <option value="venda_fechada">Venda Fechada</option>
                             <option value="perdido">Perdido</option>
                             <option value="ativo">Ativo</option>
+                            <option value="inativo">Inativo</option>
                         </select>
                     </div>
 
