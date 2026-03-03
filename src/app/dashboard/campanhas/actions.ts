@@ -113,10 +113,10 @@ export async function dispatchCampaign(formData: FormData) {
         return { error: 'Dados incompletos para o disparo.', success: false };
     }
 
-    // Gerar nome automático: template + data/hora
+    // Gerar nome automático com fuso de Brasília explícito (Vercel roda em UTC)
     const now = new Date();
-    const dateStr = now.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    const timeStr = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const dateStr = now.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric' });
+    const timeStr = now.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
     const campanhaName = `${templateName} — ${dateStr} ${timeStr}`;
 
     // Create the campaign record
@@ -580,6 +580,26 @@ export async function sendCampaign(campaignId: string) {
                     .update({ status: 'enviado', enviado_at: new Date().toISOString() })
                     .eq('campanha_id', campaignId)
                     .eq(idField, target.id);
+
+                // Extrai o texto padrão do template para exibir no histórico (substitui apenas por questões visuais)
+                let renderText = `[Campanha: ${campaign.mensagem}]`;
+                if (templateComponents) {
+                    const bodyComp = templateComponents.find(c => c.type === 'BODY');
+                    if (bodyComp && bodyComp.text) {
+                        const replaced = bodyComp.text.replace(/\{\{1\}\}/g, target.name || 'Cliente');
+                        renderText = `[Campanha: ${campaign.mensagem}]\n${replaced}`;
+                    }
+                }
+
+                // Inserir mensagem de disparo no Inbox de Conversas (Dashboard) para registro de histórico
+                await supabase.from('n8n_chat_conversas').insert({
+                    session_id: `${fullPhone}_buffer`,
+                    message: {
+                        type: 'ai',
+                        content: renderText
+                    }
+                });
+
                 return true;
             } else {
                 console.error('[sendCampaign] Meta API error:', JSON.stringify({

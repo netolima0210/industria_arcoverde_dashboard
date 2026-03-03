@@ -729,7 +729,7 @@ export default function CampanhasPage() {
                                                                     {envio.status === 'erro' && envio.mensagem_erro
                                                                         ? envio.mensagem_erro
                                                                         : envio.status === 'enviado' && envio.enviado_at
-                                                                            ? new Date(envio.enviado_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+                                                                            ? new Date(envio.enviado_at).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
                                                                             : '—'
                                                                     }
                                                                 </span>
