@@ -75,6 +75,9 @@ export default function EditLeadPage({ params }: { params: Promise<{ id: string 
                             name="contato"
                             id="contato"
                             required
+                            pattern="^55\d{10,11}$"
+                            title="Formato exigido: 55 + DDD + Número (ex: 5587999999999)"
+                            maxLength={13}
                             defaultValue={lead.contato}
                             className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm p-2 border"
                         />
@@ -88,11 +91,6 @@ export default function EditLeadPage({ params }: { params: Promise<{ id: string 
                             defaultValue={lead.status}
                             className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm p-2 border"
                         >
-                            <option value="novo">Novo</option>
-                            <option value="contatado">Contatado</option>
-                            <option value="cotacao_enviada">Cotação Enviada</option>
-                            <option value="venda_fechada">Venda Fechada</option>
-                            <option value="perdido">Perdido</option>
                             <option value="ativo">Ativo</option>
                             <option value="inativo">Inativo</option>
                         </select>

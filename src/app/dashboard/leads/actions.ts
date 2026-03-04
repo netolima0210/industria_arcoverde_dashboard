@@ -10,7 +10,7 @@ export async function createLead(formData: FormData) {
 
     const nome = formData.get('nome') as string;
     const contato = formData.get('contato') as string;
-    const status = formData.get('status') as string || 'novo';
+    const status = formData.get('status') as string || 'ativo';
 
     if (!nome || !contato) {
         return { error: 'Nome e contato são obrigatórios.' };

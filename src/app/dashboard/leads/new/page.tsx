@@ -59,8 +59,11 @@ export default function NewLeadPage() {
                             name="contato"
                             id="contato"
                             required
+                            pattern="^55\d{10,11}$"
+                            title="Formato exigido: 55 + DDD + Número (ex: 5587999999999)"
+                            maxLength={13}
                             className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm p-2 border"
-                            placeholder="Ex: (87) 99999-9999"
+                            placeholder="Ex: 5587999999999"
                         />
                     </div>
 
@@ -73,9 +76,8 @@ export default function NewLeadPage() {
                             id="status"
                             className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm p-2 border"
                         >
-                            <option value="novo">Novo</option>
-                            <option value="contatado">Contatado</option>
-                            <option value="cotacao_enviada">Cotação Enviada</option>
+                            <option value="ativo">Ativo</option>
+                            <option value="inativo">Inativo</option>
                         </select>
                     </div>
 
