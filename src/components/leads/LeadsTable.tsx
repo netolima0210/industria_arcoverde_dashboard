@@ -187,6 +187,11 @@ export function LeadsTable({ leads }: LeadsTableProps) {
                                         <div className="text-sm text-gray-500">{formatDate(lead.created_at)}</div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
+                                        <select
+                                            value={lead.status?.toLowerCase() || 'novo'}
+                                            onChange={(e) => handleStatusChange(lead.id, e.target.value)}
+                                            className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary border border-transparent hover:border-gray-200 cursor-pointer transition-all ${statusColors[lead.status?.toLowerCase() || ''] || 'bg-gray-100 text-gray-800'}`}
+                                        >
                                             <option value="ativo" className="bg-white text-gray-900">Ativo</option>
                                             <option value="inativo" className="bg-white text-gray-900">Inativo</option>
                                         </select>
@@ -218,13 +223,13 @@ export function LeadsTable({ leads }: LeadsTableProps) {
                                     </td>
                                 </tr>
                             ))}
-                    </tbody>
-                </table>
+                        </tbody>
+                    </table>
+                </div>
+                <div className="bg-white px-4 py-3 border-t border-gray-100 sm:px-6">
+                    {/* Pagination placeholder */}
+                </div>
             </div>
-            <div className="bg-white px-4 py-3 border-t border-gray-100 sm:px-6">
-                {/* Pagination placeholder */}
-            </div>
-        </div>
         </div >
     );
 }
