@@ -51,11 +51,6 @@ export function LeadsTable({ leads }: LeadsTableProps) {
     };
 
     const statusColors: Record<string, string> = {
-        'novo': 'bg-blue-100 text-blue-800',
-        'contatado': 'bg-yellow-100 text-yellow-800',
-        'cotacao_enviada': 'bg-purple-100 text-purple-800',
-        'venda_fechada': 'bg-green-100 text-green-800',
-        'perdido': 'bg-red-100 text-red-800',
         'ativo': 'bg-green-100 text-green-800',
         'inativo': 'bg-gray-100 text-gray-800',
     };
@@ -192,16 +187,6 @@ export function LeadsTable({ leads }: LeadsTableProps) {
                                         <div className="text-sm text-gray-500">{formatDate(lead.created_at)}</div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                        <select
-                                            value={lead.status?.toLowerCase() || 'novo'}
-                                            onChange={(e) => handleStatusChange(lead.id, e.target.value)}
-                                            className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary border border-transparent hover:border-gray-200 cursor-pointer transition-all ${statusColors[lead.status?.toLowerCase() || ''] || 'bg-gray-100 text-gray-800'}`}
-                                        >
-                                            <option value="novo" className="bg-white text-gray-900">Novo</option>
-                                            <option value="contatado" className="bg-white text-gray-900">Contatado</option>
-                                            <option value="cotacao_enviada" className="bg-white text-gray-900">Cotação Enviada</option>
-                                            <option value="venda_fechada" className="bg-white text-gray-900">Venda Fechada</option>
-                                            <option value="perdido" className="bg-white text-gray-900">Perdido</option>
                                             <option value="ativo" className="bg-white text-gray-900">Ativo</option>
                                             <option value="inativo" className="bg-white text-gray-900">Inativo</option>
                                         </select>
@@ -233,13 +218,13 @@ export function LeadsTable({ leads }: LeadsTableProps) {
                                     </td>
                                 </tr>
                             ))}
-                        </tbody>
-                    </table>
-                </div>
-                <div className="bg-white px-4 py-3 border-t border-gray-100 sm:px-6">
-                    {/* Pagination placeholder */}
-                </div>
+                    </tbody>
+                </table>
+            </div>
+            <div className="bg-white px-4 py-3 border-t border-gray-100 sm:px-6">
+                {/* Pagination placeholder */}
             </div>
         </div>
+        </div >
     );
 }
