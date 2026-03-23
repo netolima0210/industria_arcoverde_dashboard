@@ -1,4 +1,6 @@
 
+export const revalidate = 60;
+
 import { createClient } from '@/utils/supabase/server';
 import { MessageSquare, CheckCircle, Zap, PhoneIncoming, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { ConversationsChart } from '@/components/dashboard/ConversationsChart';

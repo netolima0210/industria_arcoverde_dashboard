@@ -95,18 +95,11 @@ export function Header() {
     useEffect(() => {
         fetchNotifications();
 
-        // Inscrever para escutar novos leads
-        const channel = supabase.channel('realtime_notifications')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'clientes' }, () => {
-                fetchNotifications();
-            })
-            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'campanhas', filter: 'status=eq.concluida' }, () => {
-                fetchNotifications();
-            })
-            .subscribe();
+        // Polling a cada 5 minutos (evita WebSocket/Realtime que gera egress contínuo)
+        const interval = setInterval(fetchNotifications, 5 * 60 * 1000);
 
         return () => {
-            supabase.removeChannel(channel);
+            clearInterval(interval);
         };
     }, []);
 

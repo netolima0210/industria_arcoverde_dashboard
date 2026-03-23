@@ -1,3 +1,5 @@
+export const revalidate = 60;
+
 import { createClient } from '@/utils/supabase/server';
 import { UserPlus, Users } from 'lucide-react';
 import { VendedorList } from '@/components/dashboard/VendedorList';
@@ -8,7 +10,7 @@ export default async function VendedoresPage() {
 
     const { data: vendedores } = await supabase
         .from('vendedores')
-        .select('*')
+        .select('id, nome, telefone, email, endereco, regiao_atende, cidades_atende, status, created_at')
         .order('nome', { ascending: true });
 
     return (

@@ -2,6 +2,14 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 export async function POST(req: Request) {
+    // Validar Bearer token de autenticação
+    const authHeader = req.headers.get('authorization');
+    const expectedToken = process.env.WEBHOOK_OPTOUT_SECRET;
+
+    if (!expectedToken || !authHeader || authHeader !== `Bearer ${expectedToken}`) {
+        return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    }
+
     try {
         // Inicializa o cliente do Supabase *dentro* da função para evitar crash no tempo de Build
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -12,7 +20,7 @@ export async function POST(req: Request) {
         let { contato } = payload;
 
         if (!contato) {
-            return NextResponse.json({ error: 'Parâmetro "contato" obrigatório no body da requisição' }, { status: 400 });
+            return NextResponse.json({ error: 'Parâmetro obrigatório ausente' }, { status: 400 });
         }
 
         // Limpar o contato para casar com o banco de dados (remover '@s.whatsapp.net' e formatar apenas os números)
@@ -26,16 +34,16 @@ export async function POST(req: Request) {
             .select();
 
         if (error) {
-            console.error('Erro ao inativar lead (opt-out) via Webhook:', error);
-            return NextResponse.json({ error: error.message }, { status: 500 });
+            console.error('[webhook/optout] Erro ao processar opt-out:', error.code);
+            return NextResponse.json({ error: 'Erro interno ao processar solicitação' }, { status: 500 });
         }
 
         if (!data || data.length === 0) {
-            return NextResponse.json({ error: 'Lead não encontrado para o contato fornecido' }, { status: 404 });
+            return NextResponse.json({ error: 'Registro não encontrado' }, { status: 404 });
         }
 
-        return NextResponse.json({ success: true, message: 'Lead inativado por opt-out com sucesso', count: data.length });
-    } catch (e: unknown) {
-        return NextResponse.json({ error: e instanceof Error ? e.message : 'Unknown error' }, { status: 500 });
+        return NextResponse.json({ success: true, message: 'Opt-out processado com sucesso', count: data.length });
+    } catch {
+        return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
     }
 }

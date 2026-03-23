@@ -1,11 +1,10 @@
 'use server'
 
-import { createClient } from '@/utils/supabase/server';
+import { requireAuth } from '@/utils/auth/requireAuth';
 import { revalidatePath } from 'next/cache';
-import { redirect } from 'next/navigation';
 
 export async function createVendedor(formData: FormData) {
-    const supabase = await createClient();
+    const { supabase } = await requireAuth();
 
     const nome = formData.get('nome') as string;
     const telefone = formData.get('telefone') as string;
@@ -37,7 +36,7 @@ export async function createVendedor(formData: FormData) {
 }
 
 export async function deleteVendedor(id: string) {
-    const supabase = await createClient();
+    const { supabase } = await requireAuth();
     const { error } = await supabase.from('vendedores').delete().eq('id', id);
 
     if (error) {
@@ -49,7 +48,7 @@ export async function deleteVendedor(id: string) {
 }
 
 export async function updateVendedorStatus(id: string, newStatus: string) {
-    const supabase = await createClient();
+    const { supabase } = await requireAuth();
 
     const { error } = await supabase.from('vendedores').update({ status: newStatus }).eq('id', id);
 

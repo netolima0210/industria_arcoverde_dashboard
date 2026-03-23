@@ -10,12 +10,12 @@ export default function EditLeadPage({ params }: { params: Promise<{ id: string 
     const { id } = use(params);
     const [loading, setLoading] = useState(false);
     const [fetching, setFetching] = useState(true);
-    const [lead, setLead] = useState<{ nome: string; contato: string; status: string; opt_out?: boolean } | null>(null);
+    const [lead, setLead] = useState<{ nome: string; contato: string; status: string; opt_out?: boolean; cidade?: string; regiao?: string; estado?: string } | null>(null);
 
     useEffect(() => {
         const supabase = createClient();
-        supabase.from('clientes').select('nome, contato, status, opt_out').eq('id', id).single().then(({ data }) => {
-            if (data) setLead({ nome: data.nome, contato: data.contato || '', status: data.status || 'novo', opt_out: data.opt_out });
+        supabase.from('clientes').select('nome, contato, status, opt_out, cidade, regiao, estado').eq('id', id).single().then(({ data }) => {
+            if (data) setLead({ nome: data.nome, contato: data.contato || '', status: data.status || 'novo', opt_out: data.opt_out, cidade: data.cidade || '', regiao: data.regiao || '', estado: data.estado || '' });
             setFetching(false);
         });
     }, [id]);
@@ -80,6 +80,54 @@ export default function EditLeadPage({ params }: { params: Promise<{ id: string 
                             maxLength={13}
                             defaultValue={lead.contato}
                             className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm p-2 border"
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="sm:col-span-2">
+                            <label htmlFor="cidade" className="block text-sm font-medium text-gray-700 mb-1">
+                                Cidade
+                            </label>
+                            <input
+                                type="text"
+                                name="cidade"
+                                id="cidade"
+                                defaultValue={lead.cidade}
+                                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm p-2 border"
+                                placeholder="Ex: Serra Talhada"
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor="estado" className="block text-sm font-medium text-gray-700 mb-1">
+                                Estado
+                            </label>
+                            <select
+                                name="estado"
+                                id="estado"
+                                defaultValue={lead.estado || ''}
+                                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm p-2 border"
+                            >
+                                <option value="">Sem estado</option>
+                                <option value="PE">Pernambuco (PE)</option>
+                                <option value="PB">Paraíba (PB)</option>
+                                <option value="CE">Ceará (CE)</option>
+                                <option value="AL">Alagoas (AL)</option>
+                                <option value="BA">Bahia (BA)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label htmlFor="regiao" className="block text-sm font-medium text-gray-700 mb-1">
+                            Região
+                        </label>
+                        <input
+                            type="text"
+                            name="regiao"
+                            id="regiao"
+                            defaultValue={lead.regiao}
+                            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm p-2 border"
+                            placeholder="Ex: Pajeú"
                         />
                     </div>
 

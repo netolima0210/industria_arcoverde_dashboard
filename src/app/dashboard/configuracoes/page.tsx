@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Settings, Bell, Shield, Globe, Save, Check, Eye, EyeOff } from 'lucide-react';
+import { Settings, Bell, Shield, Globe, Save, Check, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { createClient } from '@/utils/supabase/client';
 
 interface AppSettings {
     companyName: string;
@@ -37,6 +38,7 @@ export default function ConfiguracoesPage() {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [passwordError, setPasswordError] = useState('');
     const [passwordSaved, setPasswordSaved] = useState(false);
+    const [passwordLoading, setPasswordLoading] = useState(false);
 
     // Load settings from localStorage
     useEffect(() => {
@@ -58,7 +60,7 @@ export default function ConfiguracoesPage() {
         setSettings(prev => ({ ...prev, [key]: !prev[key] }));
     };
 
-    const handlePasswordSave = () => {
+    const handlePasswordSave = async () => {
         setPasswordError('');
         if (newPassword.length < 6) {
             setPasswordError('A senha deve ter no mínimo 6 caracteres.');
@@ -68,11 +70,28 @@ export default function ConfiguracoesPage() {
             setPasswordError('As senhas não coincidem.');
             return;
         }
-        // In a real app, call Supabase auth.updateUser here
-        setPasswordSaved(true);
-        setNewPassword('');
-        setConfirmPassword('');
-        setTimeout(() => setPasswordSaved(false), 2000);
+
+        setPasswordLoading(true);
+        try {
+            const supabase = createClient();
+            const { error } = await supabase.auth.updateUser({ password: newPassword });
+
+            if (error) {
+                setPasswordError(error.message === 'New password should be different from the old password.'
+                    ? 'A nova senha deve ser diferente da senha atual.'
+                    : 'Erro ao atualizar senha. Tente novamente.');
+                return;
+            }
+
+            setPasswordSaved(true);
+            setNewPassword('');
+            setConfirmPassword('');
+            setTimeout(() => setPasswordSaved(false), 2000);
+        } catch {
+            setPasswordError('Erro de conexão. Tente novamente.');
+        } finally {
+            setPasswordLoading(false);
+        }
     };
 
     return (
@@ -206,10 +225,10 @@ export default function ConfiguracoesPage() {
                         )}
                         <button
                             onClick={handlePasswordSave}
-                            disabled={!newPassword}
+                            disabled={!newPassword || passwordLoading}
                             className="w-full py-2.5 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
-                            {passwordSaved ? <><Check className="h-4 w-4" /> Senha Atualizada!</> : 'Alterar Senha'}
+                            {passwordLoading ? <><Loader2 className="h-4 w-4 animate-spin" /> Atualizando...</> : passwordSaved ? <><Check className="h-4 w-4" /> Senha Atualizada!</> : 'Alterar Senha'}
                         </button>
                     </div>
                 </div>

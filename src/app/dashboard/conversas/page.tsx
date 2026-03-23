@@ -1,3 +1,5 @@
+export const revalidate = 60;
+
 import { createClient } from '@/utils/supabase/server';
 import { InboxLayout } from '@/components/dashboard/InboxLayout';
 
@@ -22,21 +24,13 @@ export default async function ConversasPage() {
         .from('clientes')
         .select('id, nome, contato');
 
-    // 2. Buscar as conversas para descobrir a última mensagem por telefone
-    const allMessages: any[] = [];
-    const pageSize = 1000;
-    let from = 0;
-    while (true) {
-        const { data: batch, error } = await supabase
-            .from('n8n_chat_conversas')
-            .select('session_id, created_at')
-            .order('id', { ascending: true })
-            .range(from, from + pageSize - 1);
-        if (error || !batch || batch.length === 0) break;
-        allMessages.push(...batch);
-        if (batch.length < pageSize) break;
-        from += pageSize;
-    }
+    // 2. Buscar as conversas mais recentes (sem loop infinito) — últimas 2000 mensagens
+    // Isso cobre a grande maioria dos contatos ativos sem buscar toda a tabela
+    const { data: allMessages = [] } = await supabase
+        .from('n8n_chat_conversas')
+        .select('session_id, created_at')
+        .order('created_at', { ascending: false })
+        .limit(2000);
 
     // 3. Montar mapa: telefone normalizado → data da última mensagem
     const lastMessageMap = new Map<string, string>();

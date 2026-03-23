@@ -1,3 +1,5 @@
+export const revalidate = 60;
+
 import { createClient } from '@/utils/supabase/server';
 import { Package, Plus } from 'lucide-react';
 import { ProductList } from '@/components/dashboard/ProductList';
@@ -8,7 +10,7 @@ export default async function ProdutosPage() {
 
     const { data: products } = await supabase
         .from('produtos')
-        .select('*')
+        .select('id, codigo, nome, linha, categoria, apresentacao, embalagem, ativo')
         .order('nome', { ascending: true });
 
     return (

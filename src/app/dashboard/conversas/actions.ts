@@ -1,6 +1,6 @@
 'use server';
 
-import { createClient } from '@/utils/supabase/server';
+import { requireAuth } from '@/utils/auth/requireAuth';
 
 function normalizePhone(raw: string): string {
     const digits = raw.replace(/\D/g, '');
@@ -13,7 +13,7 @@ function normalizePhone(raw: string): string {
 export async function getLeadMessages(phone: string) {
     if (!phone) return { error: 'Telefone inválido', messages: [] };
 
-    const supabase = await createClient();
+    const { supabase } = await requireAuth();
     const cleanPhone = phone.replace(/\D/g, '');
 
     // Gerar variantes do telefone: com e sem o 9º dígito.

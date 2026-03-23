@@ -67,6 +67,51 @@ export default function NewLeadPage() {
                         />
                     </div>
 
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="sm:col-span-2">
+                            <label htmlFor="cidade" className="block text-sm font-medium text-gray-700 mb-1">
+                                Cidade
+                            </label>
+                            <input
+                                type="text"
+                                name="cidade"
+                                id="cidade"
+                                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm p-2 border"
+                                placeholder="Ex: Serra Talhada"
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor="estado" className="block text-sm font-medium text-gray-700 mb-1">
+                                Estado
+                            </label>
+                            <select
+                                name="estado"
+                                id="estado"
+                                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm p-2 border"
+                            >
+                                <option value="">Sem estado</option>
+                                <option value="PE">Pernambuco (PE)</option>
+                                <option value="PB">Paraíba (PB)</option>
+                                <option value="CE">Ceará (CE)</option>
+                                <option value="AL">Alagoas (AL)</option>
+                                <option value="BA">Bahia (BA)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label htmlFor="regiao" className="block text-sm font-medium text-gray-700 mb-1">
+                            Região
+                        </label>
+                        <input
+                            type="text"
+                            name="regiao"
+                            id="regiao"
+                            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm p-2 border"
+                            placeholder="Ex: Pajeú"
+                        />
+                    </div>
+
                     <div>
                         <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-1">
                             Status Inicial

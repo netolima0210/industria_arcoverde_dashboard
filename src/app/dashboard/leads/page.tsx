@@ -1,4 +1,6 @@
 
+export const revalidate = 60;
+
 import { createClient } from '@/utils/supabase/server';
 import { LeadsTable } from '@/components/leads/LeadsTable';
 import { Plus } from 'lucide-react';
@@ -10,7 +12,7 @@ export default async function LeadsPage() {
     // Fetch leads
     const { data: leads, error } = await supabase
         .from('clientes')
-        .select('*')
+        .select('id, nome, contato, status, created_at, cidade, regiao, estado, is_whatsapp')
         .order('nome', { ascending: true });
 
     return (

@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { requireAuth } from '@/utils/auth/requireAuth';
 import { revalidatePath } from 'next/cache';
 import { after } from 'next/server';
 
@@ -62,7 +63,7 @@ export async function uploadCampaignMedia(formData: FormData) {
 
 // ─── Create Campaign ──────────────────────────────
 export async function createCampaign(formData: FormData) {
-    const supabase = await createClient();
+    const { supabase } = await requireAuth();
 
     const nome = formData.get('nome') as string;
     const mensagem = formData.get('mensagem') as string;
@@ -137,7 +138,7 @@ export async function dispatchCampaign(formData: FormData) {
             try {
                 await sendCampaign(campaignId);
             } catch (err) {
-                console.error('Erro durante envio da campanha:', err);
+                console.error('[dispatchCampaign] Erro durante envio da campanha:', campaignId);
             }
         });
     }
@@ -147,7 +148,7 @@ export async function dispatchCampaign(formData: FormData) {
 
 // ─── Delete Campaign ──────────────────────────────
 export async function deleteCampaign(campaignId: string) {
-    const supabase = await createClient();
+    const { supabase } = await requireAuth();
 
     const { error: errorEnvios } = await supabase
         .from('campanhas_envios')
@@ -175,7 +176,7 @@ export async function deleteCampaign(campaignId: string) {
 
 // ─── Get Active Audience Count ────────────────────
 export async function getActiveAudienceCount(audience: 'leads' | 'vendedores'): Promise<number> {
-    const supabase = await createClient();
+    const { supabase } = await requireAuth();
     const table = audience === 'leads' ? 'clientes' : 'vendedores';
 
     const { count, error } = await supabase
@@ -603,7 +604,7 @@ export async function sendCampaign(campaignId: string) {
                 return true;
             } else {
                 console.error('[sendCampaign] Meta API error:', JSON.stringify({
-                    phoneId, to: fullPhone, template: campaign.mensagem, error: data.error
+                    campaignId, targetId: target.id, template: campaign.mensagem, errorCode: data.error?.code, errorMessage: data.error?.message
                 }));
                 const errCode = data.error?.code ? ` [código ${data.error.code}]` : '';
                 const errMsg = data.error?.message || 'Erro desconhecido';
@@ -649,7 +650,7 @@ export async function sendCampaign(campaignId: string) {
 
 // ─── List Campanhas ──────────────────────────────
 export async function listCampanhas() {
-    const supabase = await createClient();
+    const { supabase } = await requireAuth();
 
     const { data: campanhas, error } = await supabase
         .from('campanhas')
@@ -667,7 +668,7 @@ export async function listCampanhas() {
 
 // ─── Get Campanha Envios (detalhes por destinatário) ──
 export async function getCampanhaEnvios(campanhaId: string) {
-    const supabase = await createClient();
+    const { supabase } = await requireAuth();
 
     // Buscar a campanha para saber o público alvo
     const { data: campanha } = await supabase

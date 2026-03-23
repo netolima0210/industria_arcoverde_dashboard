@@ -1,11 +1,10 @@
 'use server'
 
-import { createClient } from '@/utils/supabase/server';
+import { requireAuth } from '@/utils/auth/requireAuth';
 import { revalidatePath } from 'next/cache';
-import { redirect } from 'next/navigation';
 
 export async function createProduct(formData: FormData) {
-    const supabase = await createClient();
+    const { supabase } = await requireAuth();
 
     const nome = formData.get('nome') as string;
     const codigo = formData.get('codigo') as string;
@@ -39,7 +38,7 @@ export async function createProduct(formData: FormData) {
 }
 
 export async function deleteProduct(id: string) {
-    const supabase = await createClient();
+    const { supabase } = await requireAuth();
     const { error } = await supabase.from('produtos').delete().eq('id', id);
 
     if (error) {
