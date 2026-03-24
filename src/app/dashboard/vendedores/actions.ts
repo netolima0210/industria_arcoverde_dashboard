@@ -2,6 +2,7 @@
 
 import { requireAuth } from '@/utils/auth/requireAuth';
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 
 export async function createVendedor(formData: FormData) {
     const { supabase } = await requireAuth();
