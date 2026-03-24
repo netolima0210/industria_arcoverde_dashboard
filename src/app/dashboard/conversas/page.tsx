@@ -26,11 +26,13 @@ export default async function ConversasPage() {
 
     // 2. Buscar as conversas mais recentes (sem loop infinito) — últimas 2000 mensagens
     // Isso cobre a grande maioria dos contatos ativos sem buscar toda a tabela
-    const { data: allMessages = [] } = await supabase
+    const { data: allMessagesRaw } = await supabase
         .from('n8n_chat_conversas')
         .select('session_id, created_at')
         .order('created_at', { ascending: false })
         .limit(2000);
+
+    const allMessages = allMessagesRaw ?? [];
 
     // 3. Montar mapa: telefone normalizado → data da última mensagem
     const lastMessageMap = new Map<string, string>();
