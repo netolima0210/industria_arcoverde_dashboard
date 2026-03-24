@@ -2,10 +2,11 @@ const { createClient } = require('@supabase/supabase-js');
 const axios = require('axios');
 require('dotenv').config({ path: '.env.local' });
 
-// Configurações Evolution API (extraídas do screenshot)
+// Configurações Evolution API (BASEADAS NO TESTE DE SUCESSO)
 const EVOLUTION_URL = 'https://evolution.app.info.pl';
 const EVOLUTION_API_KEY = '9194DE34E9DC-4567-9701-C6C631318627';
-const INSTANCE_NAME = 'a18f6201-fccd-4856-a9c7-0ab152391e4d';
+const INSTANCE_NAME = 'Max_vendedor1';
+const ENDPOINT = '/chat/whatsappNumbers';
 
 // Supabase
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -56,7 +57,7 @@ async function verifyNumbers() {
 
                 if (number.length <= 11) number = '55' + number;
 
-                const response = await axios.post(`${EVOLUTION_URL}/chat/checkNumber/${INSTANCE_NAME}`, {
+                const response = await axios.post(`${EVOLUTION_URL}${ENDPOINT}/${INSTANCE_NAME}`, {
                     numbers: [number]
                 }, {
                     headers: { 'apikey': EVOLUTION_API_KEY, 'Content-Type': 'application/json' }
