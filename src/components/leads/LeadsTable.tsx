@@ -2,7 +2,7 @@
 'use client';
 
 import { Edit, MessageCircle, Trash2 } from 'lucide-react';
-import { deleteLead, updateLeadStatus, updateMultipleLeadsStatus, verifyAndDeleteNonWhatsapp } from '@/app/dashboard/leads/actions';
+import { deleteLead, updateLeadStatus, updateMultipleLeadsStatus } from '@/app/dashboard/leads/actions';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
@@ -29,7 +29,6 @@ export function LeadsTable({ leads }: LeadsTableProps) {
     const [cidadeFilter, setCidadeFilter] = useState('');
     const [estadoFilter, setEstadoFilter] = useState('');
     const [isUpdatingBulk, setIsUpdatingBulk] = useState(false);
-    const [isVerifying, setIsVerifying] = useState(false);
 
     const filteredLeads = leads.filter(lead => {
         let matchDate = true;
@@ -74,7 +73,12 @@ export function LeadsTable({ leads }: LeadsTableProps) {
 
     const handleDelete = async (id: string) => {
         if (confirm('Tem certeza que deseja excluir este lead?')) {
-            await deleteLead(id);
+            try {
+                await deleteLead(id);
+                router.refresh();
+            } catch {
+                alert('Erro ao excluir lead.');
+            }
         }
     };
 
@@ -87,23 +91,6 @@ export function LeadsTable({ leads }: LeadsTableProps) {
         } catch (error) {
             console.error('Failed to update status', error);
             alert('Erro ao atualizar status');
-        }
-    };
-
-    const handleVerifyWhatsapp = async () => {
-        if (!confirm('Verificar todos os números via Evolution API e excluir os que não são WhatsApp?')) return;
-        setIsVerifying(true);
-        try {
-            const result = await verifyAndDeleteNonWhatsapp();
-            if (result.error) {
-                alert(result.error);
-            } else {
-                alert(`✅ Verificados: ${result.verified} | Excluídos: ${result.deleted}`);
-            }
-        } catch {
-            alert('Erro ao verificar números.');
-        } finally {
-            setIsVerifying(false);
         }
     };
 
@@ -146,13 +133,6 @@ export function LeadsTable({ leads }: LeadsTableProps) {
                         className="px-4 py-2 bg-gray-600 outline-none hover:bg-gray-700 text-white text-sm font-medium rounded-xl transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex-1 sm:flex-none whitespace-nowrap"
                     >
                         {isUpdatingBulk ? 'Salvando...' : 'Desativar Todos'}
-                    </button>
-                    <button
-                        onClick={handleVerifyWhatsapp}
-                        disabled={isVerifying}
-                        className="px-4 py-2 bg-indigo-600 outline-none hover:bg-indigo-700 text-white text-sm font-medium rounded-xl transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex-1 sm:flex-none whitespace-nowrap"
-                    >
-                        {isVerifying ? 'Verificando...' : 'Verificar WhatsApp'}
                     </button>
                 </div>
                 <div className="flex flex-col sm:flex-row justify-end gap-3 w-full sm:w-auto flex-wrap sm:flex-nowrap">

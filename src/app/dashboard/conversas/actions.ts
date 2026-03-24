@@ -38,7 +38,7 @@ export async function getLeadMessages(phone: string) {
         .from('n8n_chat_conversas')
         .select('*')
         .or(orFilter)
-        .order('id', { ascending: true });
+        .order('created_at', { ascending: true });
 
     if (error) {
         console.error('Error fetching messages:', error);

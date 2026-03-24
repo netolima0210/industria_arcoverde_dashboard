@@ -52,12 +52,21 @@ export function InboxLayout({ clientes }: { clientes: Cliente[] }) {
     useEffect(() => {
         if (selectedClient) {
             setLoading(true);
-            getLeadMessages(selectedClient.contato).then((res) => {
-                if (res.messages) {
-                    setMessages(res.messages);
-                }
-                setLoading(false);
-            });
+            setMessages([]);
+            getLeadMessages(selectedClient.contato)
+                .then((res) => {
+                    if (res.error) {
+                        console.error('Erro ao carregar mensagens:', res.error);
+                    } else if (res.messages) {
+                        setMessages(res.messages);
+                    }
+                })
+                .catch((err) => {
+                    console.error('Falha ao buscar mensagens:', err);
+                })
+                .finally(() => {
+                    setLoading(false);
+                });
         }
     }, [selectedClient]);
 
