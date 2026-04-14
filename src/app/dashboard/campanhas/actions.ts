@@ -414,6 +414,33 @@ export async function listTemplatesMeta() {
     }
 }
 
+// ─── Delete Template from Meta ───────────────────
+export async function deleteTemplateMeta(templateName: string) {
+    const token = process.env.META_WHATSAPP_TOKEN;
+    const wabaId = process.env.META_WABA_ID;
+
+    if (!token || !wabaId) {
+        return { error: 'Credenciais da Meta não configuradas.' };
+    }
+    if (!templateName) {
+        return { error: 'Nome do template não informado.' };
+    }
+
+    try {
+        const response = await fetch(
+            `${META_API_URL}/${wabaId}/message_templates?name=${encodeURIComponent(templateName)}`,
+            { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } }
+        );
+        const data = await response.json();
+        if (!response.ok || data.success === false) {
+            return { error: data.error?.message || 'Erro ao excluir template na Meta.' };
+        }
+        return { success: true };
+    } catch {
+        return { error: 'Falha na comunicação com a API da Meta.' };
+    }
+}
+
 // ─── Fetch Template Components from Meta ─────────
 // Busca os componentes de um template aprovado para construir o payload de envio correto.
 async function fetchTemplateComponents(templateName: string) {

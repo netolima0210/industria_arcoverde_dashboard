@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { listTemplatesMeta, submitTemplateMeta, dispatchCampaign, listCampanhas, getCampanhaEnvios, uploadCampaignMedia, deleteCampaign, getActiveAudienceCount } from './actions';
+import { listTemplatesMeta, submitTemplateMeta, dispatchCampaign, listCampanhas, getCampanhaEnvios, uploadCampaignMedia, deleteCampaign, getActiveAudienceCount, deleteTemplateMeta } from './actions';
 import {
     Loader2, CheckCircle2, AlertCircle, RefreshCw,
     FileText, Image as ImageIcon, FileOutput, Send, Clock, XCircle, UploadCloud,
@@ -92,6 +92,19 @@ export default function CampanhasPage() {
     const [dispatchUploading, setDispatchUploading] = useState(false);
     const dispatchFileRef = useRef<HTMLInputElement>(null);
     const [activeCount, setActiveCount] = useState<number | null>(null);
+    const [deletingTemplate, setDeletingTemplate] = useState<string | null>(null);
+
+    async function handleDeleteTemplate(tplName: string) {
+        if (!window.confirm(`Excluir o template "${tplName}" da Meta? Essa ação é irreversível e o template ficará indisponível para novas campanhas.`)) return;
+        setDeletingTemplate(tplName);
+        const res = await deleteTemplateMeta(tplName);
+        setDeletingTemplate(null);
+        if (res?.error) {
+            alert(`Erro ao excluir: ${res.error}`);
+            return;
+        }
+        setTemplates(prev => prev.filter(t => t.name !== tplName));
+    }
 
     // Fetch account when modal opens or audience changes
     useEffect(() => {
@@ -564,6 +577,18 @@ export default function CampanhasPage() {
                                             >
                                                 <Rocket className="h-4 w-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                                             </button>
+
+                                            <button
+                                                onClick={() => handleDeleteTemplate(tpl.name)}
+                                                disabled={deletingTemplate === tpl.name}
+                                                className="p-2.5 text-gray-400 hover:text-red-500 hover:bg-red-50 border border-gray-200 rounded-xl transition-all disabled:opacity-50"
+                                                title="Excluir template da Meta"
+                                            >
+                                                {deletingTemplate === tpl.name
+                                                    ? <Loader2 className="h-4 w-4 animate-spin" />
+                                                    : <Trash2 className="h-4 w-4" />
+                                                }
+                                            </button>
                                         </div>
                                     </li>
                                 ))}
@@ -588,6 +613,17 @@ export default function CampanhasPage() {
                                                     {getStatus(tpl.status).icon}
                                                     {getStatus(tpl.status).label}
                                                 </span>
+                                                <button
+                                                    onClick={() => handleDeleteTemplate(tpl.name)}
+                                                    disabled={deletingTemplate === tpl.name}
+                                                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors disabled:opacity-50"
+                                                    title="Excluir template da Meta"
+                                                >
+                                                    {deletingTemplate === tpl.name
+                                                        ? <Loader2 className="h-4 w-4 animate-spin" />
+                                                        : <Trash2 className="h-4 w-4" />
+                                                    }
+                                                </button>
                                             </div>
                                         </li>
                                     ))}
@@ -639,9 +675,12 @@ export default function CampanhasPage() {
 
                             return (
                                 <li key={camp.id}>
-                                    <button
+                                    <div
+                                        role="button"
+                                        tabIndex={0}
                                         onClick={() => handleToggleEnvios(camp.id)}
-                                        className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50/80 transition-colors text-left"
+                                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleToggleEnvios(camp.id); } }}
+                                        className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50/80 transition-colors text-left cursor-pointer"
                                     >
                                         <div className="flex items-center gap-4 flex-1 min-w-0">
                                             <div className="flex-1 min-w-0">
@@ -688,7 +727,7 @@ export default function CampanhasPage() {
                                                 : <ChevronRight className="h-4 w-4 text-gray-400" />
                                             }
                                         </div>
-                                    </button>
+                                    </div>
 
                                     {/* Detalhe expandido */}
                                     {

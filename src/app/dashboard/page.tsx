@@ -2,7 +2,7 @@
 export const revalidate = 60;
 
 import { createClient } from '@/utils/supabase/server';
-import { MessageSquare, CheckCircle, Zap, PhoneIncoming, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { MessageSquare, CheckCircle, Zap, PhoneIncoming, TrendingUp, TrendingDown, Minus, Users } from 'lucide-react';
 import { ConversationsChart } from '@/components/dashboard/ConversationsChart';
 import { DateFilter } from '@/components/dashboard/DateFilter';
 import { startOfMonth, endOfMonth } from 'date-fns';
@@ -161,6 +161,17 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         .gte('created_at', prevStartDate.toISOString())
         .lte('created_at', prevEndDate.toISOString());
 
+    // Leads Ativos vs Inativos (totais, não filtrados por período)
+    const { count: leadsAtivos } = await supabase
+        .from('clientes')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'ativo');
+
+    const { count: leadsInativos } = await supabase
+        .from('clientes')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'inativo');
+
     // 4. Chart Data
     const diffDays = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
     const isDailyChart = diffDays > 1.5;
@@ -255,6 +266,18 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             previous: prevTotalMensagens,
             invert: false,
         },
+        {
+            label: 'Leads',
+            value: `${leadsAtivos || 0} / ${leadsInativos || 0}`,
+            sub: 'ativos / inativos',
+            icon: Users,
+            color: 'bg-teal-500',
+            iconColor: 'text-white',
+            current: leadsAtivos || 0,
+            previous: 0,
+            invert: false,
+            hideTrend: true,
+        },
     ];
 
     return (
@@ -280,17 +303,20 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             </div>
 
             {/* Metric Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                 {metrics.map((m, i) => (
-                    <div key={i} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200/60 hover:shadow-md transition-all duration-200 group">
-                        <div className="flex items-center gap-3 mb-3">
-                            <div className={`p-2.5 ${m.color} rounded-xl shadow-sm`}>
-                                <m.icon className={`h-5 w-5 ${m.iconColor}`} />
+                    <div key={i} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-200/60 hover:shadow-md transition-all duration-200 group">
+                        <div className="flex items-center gap-2 mb-2">
+                            <div className={`p-2 ${m.color} rounded-lg shadow-sm`}>
+                                <m.icon className={`h-4 w-4 ${m.iconColor}`} />
                             </div>
-                            <h3 className="text-sm font-medium text-gray-500">{m.label}</h3>
+                            <h3 className="text-xs font-medium text-gray-500 truncate">{m.label}</h3>
                         </div>
-                        <p className="text-3xl font-bold text-gray-900">{m.value}</p>
-                        <TrendBadge current={m.current} previous={m.previous} invert={m.invert} />
+                        <p className="text-2xl font-bold text-gray-900">{m.value}</p>
+                        {('hideTrend' in m && m.hideTrend)
+                            ? <span className="text-xs text-gray-400 mt-1 block">{m.sub}</span>
+                            : <TrendBadge current={m.current} previous={m.previous} invert={m.invert} />
+                        }
                     </div>
                 ))}
             </div>
