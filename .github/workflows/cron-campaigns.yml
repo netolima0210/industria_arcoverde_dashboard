@@ -1,0 +1,23 @@
+name: Disparar Campanhas Agendadas
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'   # a cada 5 minutos
+  workflow_dispatch:          # disparo manual pelo painel do GitHub
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Chamar endpoint de campanhas agendadas
+        run: |
+          HTTP_STATUS=$(curl -s -o /tmp/response.json -w "%{http_code}" \
+            -X POST https://dashboard.clpda.com.br/api/cron/dispatch-campaign \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json")
+          echo "Status HTTP: $HTTP_STATUS"
+          cat /tmp/response.json
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "Erro: endpoint retornou $HTTP_STATUS"
+            exit 1
+          fi
