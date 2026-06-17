@@ -69,6 +69,7 @@ export async function createCampaign(formData: FormData) {
     const mensagem = formData.get('mensagem') as string;
     const publico_alvo = formData.get('publico_alvo') as string;
     const imagem_url = formData.get('imagem_url') as string | null;
+    const scheduled_at = formData.get('scheduled_at') as string | null;
 
     if (!nome || !mensagem || !publico_alvo) {
         return { error: 'Nome, mensagem e público-alvo são obrigatórios.' };
@@ -90,7 +91,8 @@ export async function createCampaign(formData: FormData) {
         total_alvos: count || 0,
         enviados: 0,
         erros: 0,
-        status: 'rascunho'
+        status: scheduled_at ? 'agendada' : 'rascunho',
+        scheduled_at: scheduled_at || null,
     }).select().single();
 
     if (error) {
@@ -109,6 +111,7 @@ export async function dispatchCampaign(formData: FormData) {
     const templateName = formData.get('template_name') as string;
     const audience = formData.get('audience') as string;
     const imageUrl = formData.get('image_url') as string | null;
+    const scheduledAt = formData.get('scheduled_at') as string | null;
 
     if (!templateName || !audience) {
         return { error: 'Dados incompletos para o disparo.', success: false };
@@ -126,9 +129,15 @@ export async function dispatchCampaign(formData: FormData) {
     campaignFormData.set('mensagem', templateName); // Store template name in mensagem field
     campaignFormData.set('publico_alvo', audience);
     if (imageUrl) campaignFormData.set('imagem_url', imageUrl);
+    if (scheduledAt) campaignFormData.set('scheduled_at', scheduledAt);
 
     const createResult = await createCampaign(campaignFormData);
     if (createResult.error) return { error: createResult.error, success: false };
+
+    // Se tem agendamento, não disparar agora — o cron vai disparar no horário certo
+    if (scheduledAt) {
+        return { success: true, campaignId: createResult.campaign?.id, scheduled: true, error: null };
+    }
 
     // Disparar envio em background usando after() para não bloquear a resposta
     // Isso evita timeout na Vercel quando há muitos leads com delay de 15s cada
@@ -144,6 +153,24 @@ export async function dispatchCampaign(formData: FormData) {
     }
 
     return { success: true, campaignId: createResult.campaign?.id, error: null };
+}
+
+// ─── Cancel Scheduled Campaign ───────────────────
+export async function cancelScheduledCampaign(campaignId: string) {
+    const { supabase } = await requireAuth();
+
+    const { error } = await supabase
+        .from('campanhas')
+        .update({ status: 'rascunho', scheduled_at: null })
+        .eq('id', campaignId)
+        .eq('status', 'agendada'); // guard: só cancela se ainda estiver agendada
+
+    if (error) {
+        console.error('Erro ao cancelar agendamento:', error);
+        return { error: 'Não foi possível cancelar o agendamento.' };
+    }
+
+    return { success: true };
 }
 
 // ─── Delete Campaign ──────────────────────────────
@@ -396,6 +423,7 @@ export async function listTemplatesMeta() {
 
         const templates = (data.data as any[]).map(t => {
             const headerComp = (t.components || []).find((c: any) => c.type === 'HEADER');
+            const bodyComp   = (t.components || []).find((c: any) => c.type === 'BODY');
             const headerFormat: string = headerComp?.format || 'NONE';
             const has_media_header = ['IMAGE', 'DOCUMENT', 'VIDEO'].includes(headerFormat);
             return {
@@ -405,6 +433,7 @@ export async function listTemplatesMeta() {
                 language: t.language as string,
                 has_media_header,
                 header_format: headerFormat,
+                body_preview: (bodyComp?.text as string | undefined) ?? undefined,
             };
         });
 
@@ -490,6 +519,11 @@ export async function sendCampaign(campaignId: string) {
         .single();
 
     if (!campaign) return { error: 'Campanha não encontrada.' };
+
+    // Guard: só processa campanhas em rascunho ou agendadas
+    if (!['rascunho', 'agendada'].includes(campaign.status)) {
+        return { error: 'Campanha já processada ou em estado inválido.' };
+    }
 
     // Update status
     await supabase.from('campanhas').update({ status: 'processando' }).eq('id', campaignId);

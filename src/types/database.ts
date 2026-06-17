@@ -194,6 +194,7 @@ export interface Database {
                     enviados: number
                     erros: number
                     created_at: string
+                    scheduled_at: string | null
                 }
                 Insert: {
                     id?: string
@@ -206,6 +207,7 @@ export interface Database {
                     enviados?: number
                     erros?: number
                     created_at?: string
+                    scheduled_at?: string | null
                 }
                 Update: {
                     id?: string
@@ -218,6 +220,7 @@ export interface Database {
                     enviados?: number
                     erros?: number
                     created_at?: string
+                    scheduled_at?: string | null
                 }
             },
             campanhas_envios: {

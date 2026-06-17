@@ -2,6 +2,9 @@
   "functions": {
     "src/app/dashboard/campanhas/**": {
       "maxDuration": 300
+    },
+    "src/app/api/cron/**": {
+      "maxDuration": 60
     }
   }
 }
