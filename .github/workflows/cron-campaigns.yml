@@ -11,7 +11,7 @@ jobs:
     steps:
       - name: Chamar endpoint de campanhas agendadas
         run: |
-          HTTP_STATUS=$(curl -s -o /tmp/response.json -w "%{http_code}" \
+          HTTP_STATUS=$(curl -s --max-time 60 -o /tmp/response.json -w "%{http_code}" \
             -X POST https://dashboard.clpda.com.br/api/cron/dispatch-campaign \
             -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
             -H "Content-Type: application/json")
