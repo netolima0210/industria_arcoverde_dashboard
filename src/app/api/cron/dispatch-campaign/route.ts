@@ -5,7 +5,7 @@ import { sendCampaign } from '@/app/dashboard/campanhas/actions';
 
 export async function POST(req: Request) {
     const cronSecret = req.headers.get('x-cron-secret');
-    const expectedSecret = process.env.CRON_SECRET;
+    const expectedSecret = process.env.CRON_SECRET?.trim();
 
     if (!expectedSecret || cronSecret !== expectedSecret) {
         return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
